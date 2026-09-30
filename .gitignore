@@ -1,0 +1,16 @@
+# Archivos de macOS
+.DS_Store
+
+# Archivos multimedia: pesan demasiado para Git
+data/
+*.mp4
+*.mov
+*.wav
+*.mp3
+
+# Secretos (claves, tokens): NUNCA a GitHub
+.env
+
+# Python
+__pycache__/
+.venv/
