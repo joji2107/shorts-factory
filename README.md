@@ -6,7 +6,7 @@ subtítulos automáticos y un agente de Claude conectado por MCP.
 
 ## Estado
 - [x] Fase 1: Git y GitHub
-- [ ] Fase 2: Docker
+- [x] Fase 2: Docker
 - [ ] Fase 3: Pipeline FFmpeg
 - [ ] Fase 4: Scripts Python
 - [ ] Fase 5: Servidor MCP + Claude Code
