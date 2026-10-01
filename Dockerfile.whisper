@@ -1,0 +1,20 @@
+# Partimos de la imagen que ya hicimos (Ubuntu + FFmpeg)
+FROM shorts-ffmpeg
+
+# Python y la herramienta para crear entornos virtuales
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Entorno virtual propio e instalación de faster-whisper dentro de él
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir faster-whisper "av==18.1.0"
+
+# El python del entorno virtual pasa a ser el que se usa por defecto
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Los modelos descargados se guardan en mi carpeta data (que sí persiste)
+ENV HF_HOME=/data/modelos
+
+WORKDIR /data
+CMD ["bash"]
