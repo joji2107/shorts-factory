@@ -1,7 +1,6 @@
 # Fase 5: Subtítulos automáticos con Whisper
 
-> Estado: transcripción terminada. Los subtítulos dinámicos (pocas palabras
-> por pantalla, grabados en el vídeo) quedan para la siguiente sesión.
+> > Estado: fase terminada. Transcripción con faster-whisper y subtítulos dinámicos en ASS grabados en el vídeo.
 
 ## Objetivo
 Transcribir mi voz con tiempos por palabra, dentro de Docker y con solo 8 GB
@@ -188,10 +187,76 @@ cualquiera que mire el short.
 - Que `diff` ayuda a separar el ruido de las diferencias que importan.
 - [Añade aquí lo que tú sientas que has aprendido]
 
+---
+
+## Segunda parte: subtítulos dinámicos
+
+### Por qué ASS y no SRT
+El SRT solo guarda texto y tiempos. El formato **ASS** (Advanced SubStation
+Alpha) guarda también fuente, tamaño, colores, contorno y posición, y FFmpeg
+lo dibuja sobre la imagen con el filtro `ass`.
+
+### Fuente en la imagen
+La imagen de Ubuntu no trae fuentes. Añadí `fonts-dejavu-core` al `RUN` del
+`Dockerfile` base y reconstruí las dos imágenes, en orden (la segunda parte de
+la primera):
+
+```bash
+docker build -t shorts-ffmpeg .
+docker build -f Dockerfile.whisper -t shorts-whisper .
+```
+
+Comprobaciones:
+```bash
+docker run --rm shorts-ffmpeg ls /usr/share/fonts/truetype/dejavu
+docker run --rm shorts-ffmpeg ffmpeg -hide_banner -filters | grep -w ass
+```
+
+### El script `scripts/generar_ass.py`
+Lee el `.json` palabra a palabra y genera un `.ass` con pocas palabras por
+pantalla. Cierra un grupo cuando:
+- llega a `MAX_PALABRAS` (3),
+- hay un silencio mayor que `PAUSA_MAX` (0,45 s),
+- o la palabra termina en puntuación (`. ? ! , ; :`).
+
+Si el siguiente grupo empieza en menos de 0,25 s, alarga el actual hasta ahí
+para que el texto no parpadee.
+
+Estilo (en `CABECERA`): DejaVu Sans negrita, tamaño 80, blanco con contorno
+negro, centrado abajo y elevado 560 px. Texto en mayúsculas (`MAYUSCULAS`).
+
+```bash
+docker run --rm -v "$PWD/data:/data" -v "$PWD/scripts:/scripts" \
+  shorts-whisper python /scripts/generar_ass.py /data/salida/voz_v2_nr14.json
+```
+
+### Vídeo de prueba con fondo de color
+```bash
+docker run --rm -v "$PWD/data:/data" shorts-ffmpeg \
+  ffmpeg -hide_banner -y \
+    -f lavfi -i "color=c=0x14213d:s=1080x1920:r=30" \
+    -i /data/salida/voz_v2_nr14.wav \
+    -vf "ass=/data/salida/voz_v2_nr14.ass" \
+    -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \
+    -c:a aac -b:a 192k -ar 48000 \
+    -shortest \
+    /data/salida/prueba_subtitulos.mp4
+```
+- `color=...`: fondo virtual infinito del tamaño de un short.
+- Dos `-i`: fondo y voz, combinados en un archivo.
+- `-crf 20`: calidad de vídeo (más bajo = más calidad y más peso).
+- `-shortest`: corta cuando acaba el audio, porque el fondo no termina nunca.
+
+Resultado: sincronía y legibilidad correctas. [Anota: número de grupos,
+tiempo de renderizado y cualquier ajuste que hicieras.]
+
+### Problema: `Unrecognized option 'w'`
+- **Causa:** escribí `!` en lugar de `|` (pipe). Sin pipe, `grep -w ass`
+  llegaba a FFmpeg como si fueran opciones suyas.
+- **Solución:** en el teclado de Mac en español, `|` es `Option + 1`.
+
 ## Pendiente
-- Subtítulos dinámicos: convertir el `.json` (palabra a palabra) en bloques de
-  pocas palabras y grabarlos en el vídeo con FFmpeg.
-- Si se añade intro o música antes de la voz, hay que desplazar los tiempos
-  de los subtítulos esa misma cantidad.
-- Revisar el `.srt` antes de publicar, aunque se use `medium`.
+- Si se añade intro o música antes de la voz, desplazar los subtítulos.
+- Revisar el `.srt` y el `.json` antes de publicar, aunque se use `medium`.
 - Revisar si faster-whisper ya soporta PyAV 19.
+- Mejora futura: resaltar la palabra que se está diciendo (efecto karaoke).

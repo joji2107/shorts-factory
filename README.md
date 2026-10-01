@@ -13,7 +13,7 @@ FFmpeg, scripting, agentes de IA y documentación técnica.
 - [x] Fase 2: Docker con Colima
 - [x] Fase 3: FFmpeg dentro de un contenedor
 - [x] Fase 4: Voz (grabación en GarageBand, medición y procesado con FFmpeg)
-- [ ] Fase 5: Subtítulos con Whisper (transcripción hecha; faltan los subtítulos dinámicos)
+- [x] Fase 5: Subtítulos con Whisper (transcripción hecha; faltan los subtítulos dinámicos)
 - [ ] Fase 6: Montaje del short (voz, imagen, música y subtítulos)
 - [ ] Fase 7: Scripts en Python que automaticen el pipeline
 - [ ] Fase 8: Servidor MCP y Claude Code
@@ -62,6 +62,12 @@ Transcribir un audio (`small` para pruebas, `medium` para versiones finales):
 ```bash
 docker run --rm -t -v "$PWD/data:/data" -v "$PWD/scripts:/scripts" \
   shorts-whisper python /scripts/transcribir.py /data/salida/audio.wav medium es
+```
+Generar subtítulos dinámicos (.ass) a partir del .json de palabras:
+
+```bash
+docker run --rm -v "$PWD/data:/data" -v "$PWD/scripts:/scripts" \
+  shorts-whisper python /scripts/generar_ass.py /data/salida/audio.json
 ```
 
 ## Documentación
