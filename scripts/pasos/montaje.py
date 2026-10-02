@@ -1,4 +1,10 @@
-"""Pasos de vídeo: fondo a partir de la lista de cortes, y render final."""
+"""Pasos de vídeo: fondo a partir de la lista de cortes, y render final.
+
+El render normaliza el volumen en dos pasadas: primero mezcla el audio y lo mide,
+y después aplica la corrección exacta al montarlo con el vídeo.
+"""
+import json
+
 from .utilidades import ejecutar, duracion
 
 FORMATO = "aformat=sample_rates=48000:channel_layouts=stereo"
@@ -45,26 +51,23 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c):
     ])
 
 
-def construir_grafo(ass, total, musica, efectos, loudnorm):
-    """Escribe el grafo de la mezcla. 'efectos' es una lista de (retraso_ms, volumen)."""
-    partes = [f"[0:v]ass={ass}[video]"]
-
+def construir_grafo_audio(total, musica, efectos):
+    """Grafo de la mezcla de audio, sin normalizar. Entradas: 0 voz, 1 música (si hay),
+    y después los efectos. 'efectos' es una lista de (retraso_ms, volumen)."""
     if musica:
-        partes.append(f"[1:a]{FORMATO},asplit=2[voz][voz_sc]")
-        partes.append(
-            f"[2:a]{FORMATO},volume={musica['volumen']},"
+        partes = [
+            f"[0:a]{FORMATO},asplit=2[voz][voz_sc]",
+            f"[1:a]{FORMATO},volume={musica['volumen']},"
             f"afade=t=in:d={musica['fundido_entrada']},"
-            f"afade=t=out:st={total - musica['fundido_salida']:.3f}:d={musica['fundido_salida']}[musica]"
-        )
-        partes.append(
+            f"afade=t=out:st={total - musica['fundido_salida']:.3f}:d={musica['fundido_salida']}[musica]",
             f"[musica][voz_sc]sidechaincompress=threshold={musica['umbral_ducking']}:"
             f"ratio={musica['ratio_ducking']}:attack={musica['ataque_ducking']}:"
-            f"release={musica['relajacion_ducking']}[musica_duck]"
-        )
-        entradas, siguiente = ["[voz]", "[musica_duck]"], 3
+            f"release={musica['relajacion_ducking']}[musica_duck]",
+        ]
+        entradas, siguiente = ["[voz]", "[musica_duck]"], 2
     else:
-        partes.append(f"[1:a]{FORMATO}[voz]")
-        entradas, siguiente = ["[voz]"], 2
+        partes = [f"[0:a]{FORMATO}[voz]"]
+        entradas, siguiente = ["[voz]"], 1
 
     for n, (retraso, volumen) in enumerate(efectos):
         partes.append(
@@ -73,20 +76,33 @@ def construir_grafo(ass, total, musica, efectos, loudnorm):
         entradas.append(f"[s{n}]")
 
     partes.append(
-        f"{''.join(entradas)}amix=inputs={len(entradas)}:duration=longest:normalize=0,"
-        f"loudnorm={loudnorm}[audio]"
+        f"{''.join(entradas)}amix=inputs={len(entradas)}:duration=longest:normalize=0[mezcla]"
     )
     return ";\n".join(partes)
 
 
+def leer_json_final(texto):
+    """loudnorm escribe su informe JSON al final de la salida de FFmpeg: lo extrae."""
+    return json.loads(texto[texto.rfind("{"): texto.rfind("}") + 1])
+
+
+def medir_volumen(archivo, objetivo):
+    """Primera pasada de loudnorm: mide el audio sin modificarlo."""
+    resultado = ejecutar([
+        "ffmpeg", "-hide_banner", "-nostats", "-i", archivo,
+        "-af", f"loudnorm={objetivo}:print_format=json", "-f", "null", "-",
+    ])
+    return leer_json_final(resultado.stderr)
+
+
 def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
-    """Mezcla vídeo, voz, música y efectos, y graba los subtítulos."""
+    """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos."""
     total = duracion(voz) + config["final"]["cola"]
     if duracion(fondo) < total:
         print("   AVISO: el fondo dura menos que la voz. Faltan cortes en la lista.")
 
     musica = config["musica"] if config["musica"]["archivo"] else None
-    entradas = ["-i", fondo, "-i", voz]
+    entradas = ["-i", voz]
     if musica:
         entradas += ["-ss", musica["inicio"], "-t", f"{total:.3f}", "-i", raiz / musica["archivo"]]
 
@@ -98,15 +114,34 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
         efectos.append((retraso, config["efectos"]["volumen"]))
         entradas += ["-i", archivo]
 
-    grafo = construir_grafo(ass, total, musica, efectos, config["final"]["loudnorm"])
-    grafo_txt.write_text(grafo, encoding="utf-8")
-
+    # 1) Mezcla de audio, todavía sin normalizar
+    mezcla_wav = salida.parent / "mezcla.wav"
+    grafo_txt.write_text(construir_grafo_audio(total, musica, efectos), encoding="utf-8")
     ejecutar([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *entradas,
-        "-filter_complex_script", grafo_txt,
+        "-filter_complex_script", grafo_txt, "-map", "[mezcla]", "-t", f"{total:.3f}",
+        "-ar", "48000", "-c:a", "pcm_s24le", mezcla_wav,
+    ])
+
+    # 2) Primera pasada: medir la mezcla
+    objetivo = config["final"]["loudnorm"]
+    m = medir_volumen(mezcla_wav, objetivo)
+
+    # 3) Segunda pasada: corrección exacta con los valores medidos, y montaje con el vídeo
+    loudnorm = (
+        f"loudnorm={objetivo}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+        f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
+        f"offset={m['target_offset']}:linear=true:print_format=json"
+    )
+    resultado = ejecutar([
+        "ffmpeg", "-hide_banner", "-nostats", "-y", "-i", fondo, "-i", mezcla_wav,
+        "-filter_complex", f"[0:v]ass={ass}[video];[1:a]{loudnorm}[audio]",
         "-map", "[video]", "-map", "[audio]", "-t", f"{total:.3f}",
         "-c:v", "libx264", "-preset", "medium", "-crf", config["final"]["crf"],
         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         salida,
     ])
+    final = leer_json_final(resultado.stderr)
+    print(f"   volumen: {m['input_i']} LUFS -> {final['output_i']} LUFS "
+          f"(pico {final['output_tp']} dBTP, modo {final['normalization_type']})")
     print(f"   duración final: {total:.1f} s, {len(efectos)} efectos")
