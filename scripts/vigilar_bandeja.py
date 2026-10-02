@@ -7,7 +7,7 @@ El nombre del archivo decide el short y el tema: "002-caballo.wav" crea el short
 
 Flujo:
   data/bandeja/  -> el audio pasa a data/archivo/ y se crea el short
-                 -> el vídeo terminado se copia a data/revision/ para revisarlo
+                 -> el vídeo terminado se mueve a data/revision/ para revisarlo
                  -> si algo falla, el audio va a data/errores/ con un .log del error
 Todo queda anotado en data/registro.log.
 """
@@ -113,8 +113,13 @@ def limpiar(nombre):
 def procesar(audio, plantilla):
     nombre = audio.stem
     archivado = ARCHIVO / audio.name
+    if archivado.exists():
+        # Nunca se sobrescribe una grabación archivada: la nueva lleva la fecha y la hora
+        archivado = ARCHIVO / f"{nombre}_{datetime.now():%Y%m%d-%H%M}{audio.suffix}"
     shutil.move(audio, archivado)   # sale de la bandeja: no se procesa dos veces
     registrar(f"INICIO {nombre}")
+    if archivado.name != audio.name:
+        registrar(f"       Ya había un {audio.name} archivado: el nuevo se guarda como {archivado.name}")
     inicio = time.perf_counter()
     try:
         preparar_receta(nombre, archivado, plantilla)
@@ -144,10 +149,20 @@ def main():
 
     registrar(f"Vigilando data/bandeja cada {args.intervalo} s "
               f"(plantilla '{args.plantilla}'). Ctrl+C para parar.")
+    vacios = set()   # archivos de 0 bytes ya anotados en el registro
     try:
         while True:
             for audio in sorted(BANDEJA.iterdir()):
-                if audio.suffix.lower() in EXTENSIONES and esta_completo(audio):
+                if audio.suffix.lower() not in EXTENSIONES:
+                    continue
+                # Un archivo vacío se salta sin esperar y se anota una sola vez
+                if audio.stat().st_size == 0:
+                    if audio.name not in vacios:
+                        registrar(f"VACÍO  {audio.name} ocupa 0 bytes: se ignora hasta que tenga contenido")
+                        vacios.add(audio.name)
+                    continue
+                vacios.discard(audio.name)
+                if esta_completo(audio):
                     procesar(audio, args.plantilla)
             time.sleep(args.intervalo)
     except KeyboardInterrupt:
