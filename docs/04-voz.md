@@ -223,3 +223,47 @@ highpass 80 Hz → afftdn (nr=14, nf=-66) → acompressor (-24 dB, 3:1,
 - Si aún hay siseo entre frases, probar una puerta de ruido (`agate`).
 - Mejorar la acústica de la sala (reverberación) al grabar.
 - Siguiente fase: subtítulos automáticos con Whisper.
+
+
+---
+
+## Revisión: ecualización y doble compresión
+
+### El problema
+Al ver el primer short en el móvil, la voz sonaba bien, pero le faltaba
+algo para sonar profesional. [Describe aquí con tus palabras qué notabas.]
+
+### Diagnóstico
+- **El pitch quedó descartado**: cambiar el tono suele sonar artificial y
+  no es lo que hacen los locutores.
+- **Mi cadena no tenía ninguna ecualización.** Filtraba graves, reducía
+  ruido, comprimía y normalizaba, pero no daba forma al timbre.
+- **La interpretación** también cuenta (energía, ritmo, hablarle a una
+  persona) y mejora con la práctica.
+
+### Prueba A/B/C
+- A: cadena anterior (`voz_v2_nr14.wav`).
+- B: + ecualización (`voz_v3_eq.wav`).
+- C: + ecualización y segunda compresión (`voz_v3_eq_comp.wav`). **Elegida.**
+
+| Filtro | Qué hace | Por qué |
+|--------|----------|---------|
+| `bass=g=2:f=120` | +2 dB por debajo de 120 Hz | Calidez y cuerpo |
+| `equalizer=f=300:t=q:w=1:g=-3` | -3 dB en torno a 300 Hz | Quita el sonido "de caja" |
+| `equalizer=f=4000:t=q:w=1:g=3` | +3 dB en torno a 4 kHz | Presencia e inteligibilidad |
+| `treble=g=2:f=10000` | +2 dB por encima de 10 kHz | Aire y brillo |
+| 2.º `acompressor` (-16 dB, 4:1, 5 ms / 60 ms) | Compresión rápida | Densidad y cercanía |
+
+### Cadena actual
+```
+highpass → afftdn → bass → equalizer 300 Hz → equalizer 4 kHz → treble
+→ acompressor → acompressor → loudnorm
+```
+Guardada como receta en `shorts/001-pulpo/voz.txt`.
+
+Como la voz nueva empieza en el mismo punto (`-ss 5`), los tiempos de los
+subtítulos siguen valiendo y no hizo falta volver a transcribir.
+
+### Pendiente
+- Si las eses suenan ásperas por el realce de 4 kHz, añadir un de-esser.
+- Ajustar los valores a mi voz con la experiencia de los próximos shorts.
