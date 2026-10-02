@@ -13,5 +13,15 @@
       "data/biblioteca/sfx/whoosh_01.mp3",
       "data/biblioteca/sfx/whoosh_02.mp3"
     ]
+  },
+  "audio_original": "data/archivo/900-pulpo.wav",
+  "video": {
+    "clips": [
+      "pulpo_01",
+      "pulpo_02",
+      "pulpo_03",
+      "pulpo_04",
+      "pulpo_05"
+    ]
   }
 }

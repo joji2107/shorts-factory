@@ -4,7 +4,7 @@ import re
 from .utilidades import ejecutar, duracion
 
 
-def detectar_voz(original, umbral="-45dB"):
+def detectar_voz(original, umbral="-45dB", margen=0.3):
     """Devuelve (inicio, fin) de la parte con voz, saltando el silencio del principio
     y del final de la grabación. Se usa cuando la configuración dice "inicio": "auto"."""
     texto = ejecutar([
@@ -18,7 +18,7 @@ def detectar_voz(original, umbral="-45dB"):
     inicio, fin = 0.0, total
     # Si la grabación empieza en silencio, la voz empieza donde acaba ese silencio
     if comienzos and comienzos[0] <= 0.1 and finales:
-        inicio = max(0.0, finales[0] - 0.3)
+        inicio = max(0.0, finales[0] - margen)
     # Si termina en silencio, se corta medio segundo después de la última palabra
     if comienzos and comienzos[-1] > inicio and (len(finales) < len(comienzos) or finales[-1] >= total - 0.1):
         fin = min(total, comienzos[-1] + 0.5)
@@ -27,7 +27,8 @@ def detectar_voz(original, umbral="-45dB"):
 
 def procesar_voz(original, salida, config):
     if config["inicio"] == "auto":
-        inicio, fin = detectar_voz(original)
+        inicio, fin = detectar_voz(original, config.get("umbral_silencio", "-45dB"),
+                                   config.get("margen_inicio", 0.3))
         print(f"   voz detectada entre {inicio:.2f} y {fin:.2f} s")
         recorte = ["-ss", f"{inicio:.3f}", "-t", f"{fin - inicio:.3f}"]
     else:

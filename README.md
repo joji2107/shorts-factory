@@ -1,11 +1,11 @@
 # Shorts Factory
 
-Pipeline en Docker para crear vídeos cortos (YouTube Shorts / Reels / TikTok)
-con voz propia, imagen de apoyo, música y subtítulos automáticos, y un
-agente de Claude conectado mediante MCP.
+Pipeline en Docker que convierte una grabación de voz en un vídeo corto
+(YouTube Shorts / Reels / TikTok) con imagen de apoyo, música, efectos y
+subtítulos automáticos. Suelto un audio en una carpeta y el short se hace solo.
 
 Proyecto de aprendizaje de un estudiante de ASIX: contenedores, Linux,
-FFmpeg, scripting, agentes de IA y documentación técnica.
+FFmpeg, Python, Git, agentes de IA y documentación técnica.
 
 ## Estado
 
@@ -15,64 +15,78 @@ FFmpeg, scripting, agentes de IA y documentación técnica.
 - [x] Fase 4: Voz (grabación en GarageBand, medición y procesado con FFmpeg)
 - [x] Fase 5: Subtítulos con Whisper (transcripción y subtítulos dinámicos)
 - [x] Fase 6: Montaje del short (clips, voz, música, efectos y subtítulos)
-- [ ] Fase 7: Scripts en Python que automaticen el pipeline
+- [x] Fase 7: Automatización con Python (pipeline completo y carpeta bandeja)
 - [ ] Fase 8: Servidor MCP y Claude Code
+- [ ] Fase 9: Estrategia de contenido y canales
 - [ ] Producción: publicar al menos 3 shorts por semana
 
 Shorts terminados: 1 (`shorts/001-pulpo`).
+
+## Uso diario
+
+1. Arrancar Colima: `colima start`
+2. Arrancar el vigilante:
+
+```bash
+docker run --rm -t -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
+  shorts-whisper python /proyecto/scripts/vigilar_bandeja.py
+```
+
+3. Grabar la voz y soltarla en `data/bandeja/` con el nombre `NNN-tema.wav`
+   (por ejemplo `002-caballo.wav`). El tema debe existir como etiqueta de
+   vídeos en `biblioteca/indice.csv`.
+4. Revisar el resultado en `data/revision/` y, si está bien, moverlo a `data/listos/`.
+
+Rehacer un paso de un short concreto:
+
+```bash
+docker run --rm -t -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
+  shorts-whisper python /proyecto/scripts/crear_short.py 002-caballo --rehacer subtitulos
+```
+
+Pasos: `voz`, `transcripcion`, `subtitulos`, `fondo`, `render`.
 
 ## Estructura del proyecto
 
 ```
 shorts-factory/
-├── Dockerfile          # Imagen shorts-ffmpeg (Ubuntu + FFmpeg + fuentes)
-├── Dockerfile.whisper  # Imagen shorts-whisper (sobre la anterior + faster-whisper)
-├── README.md
-├── .gitignore
-├── biblioteca/         # Índice de licencias del material (indice.csv)
-├── shorts/             # Recetas de cada short (cortes y mezcla)
-├── scripts/            # Scripts de Python
-├── docs/               # Bitácora de cada fase
-└── data/               # NO se sube a Git
-    ├── entrada/        # Material de origen (voz grabada)
-    ├── salida/         # Resultados
-    ├── trabajo/        # Archivos intermedios (se pueden borrar)
-    ├── modelos/        # Modelos de Whisper
-    └── biblioteca/     # Vídeos, música, efectos y licencias descargadas
+├── Dockerfile            # Imagen shorts-ffmpeg (Ubuntu + FFmpeg + fuentes)
+├── Dockerfile.whisper    # Imagen shorts-whisper (anterior + Python + faster-whisper)
+├── config/
+│   ├── por_defecto.json  # Valores comunes a todos los shorts
+│   └── plantillas/       # Plantillas para los shorts nuevos
+├── scripts/
+│   ├── crear_short.py    # Crea un short paso a paso
+│   ├── vigilar_bandeja.py
+│   └── pasos/            # Un módulo por paso
+├── shorts/               # Receta de cada short (configuración y cortes)
+├── biblioteca/           # Índice de licencias del material (indice.csv)
+├── docs/                 # Bitácora de cada fase
+└── data/                 # NO se sube a Git
+    ├── bandeja/          # Audios nuevos (dispara el proceso)
+    ├── archivo/          # Audios ya procesados
+    ├── revision/         # Shorts terminados, pendientes de revisar
+    ├── listos/           # Shorts aprobados para publicar
+    ├── errores/          # Audios que fallaron, con su .log
+    ├── shorts/           # Archivos de trabajo de cada short
+    ├── biblioteca/       # Vídeos, música, efectos y licencias
+    ├── modelos/          # Modelos de Whisper
+    └── registro.log      # Registro del vigilante
 ```
 
-La carpeta `data/` no existe al clonar el repositorio. Hay que crearla:
+Al clonar el repositorio, `data/` no existe. Las carpetas de la bandeja las
+crea el vigilante; las de la biblioteca hay que crearlas:
 
 ```bash
-mkdir -p data/entrada data/salida data/trabajo
 mkdir -p data/biblioteca/video data/biblioteca/musica data/biblioteca/sfx data/biblioteca/licencias
 ```
 
-## Uso básico
-
-Con Colima arrancado, construir las imágenes:
+Y construir las imágenes:
 
 ```bash
-colima start
 docker build -t shorts-ffmpeg .
 docker build -f Dockerfile.whisper -t shorts-whisper .
 ```
-
-Transcribir un audio (`small` para pruebas, `medium` para versiones finales):
-
-```bash
-docker run --rm -t -v "$PWD/data:/data" -v "$PWD/scripts:/scripts" \
-  shorts-whisper python /scripts/transcribir.py /data/salida/audio.wav medium es
-```
-
-Generar subtítulos dinámicos (.ass) a partir del .json de palabras:
-
-```bash
-docker run --rm -v "$PWD/data:/data" -v "$PWD/scripts:/scripts" \
-  shorts-whisper python /scripts/generar_ass.py /data/salida/audio.json
-```
-
-El proceso completo de montaje está en `docs/06-montaje.md`.
 
 ## Documentación
 
@@ -84,6 +98,7 @@ El proceso completo de montaje está en `docs/06-montaje.md`.
 | 4 | `docs/04-voz.md` |
 | 5 | `docs/05-subtitulos.md` |
 | 6 | `docs/06-montaje.md` |
+| 7 | `docs/07-automatizacion.md` |
 
 ## Entorno
 

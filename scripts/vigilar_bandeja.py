@@ -101,7 +101,7 @@ def procesar(audio, plantilla):
     inicio = time.perf_counter()
     try:
         preparar_receta(nombre, archivado, plantilla)
-        final = crear(nombre)
+        final = crear(nombre, rehacer="voz")   # audio nuevo: se rehace todo desde la voz
         destino = REVISION / f"{nombre}.mp4"
         shutil.copy2(final, destino)
         minutos = (time.perf_counter() - inicio) / 60
