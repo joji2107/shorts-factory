@@ -98,7 +98,7 @@ def medir_volumen(archivo, objetivo):
 def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
     """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos."""
     total = duracion(voz) + config["final"]["cola"]
-    if duracion(fondo) < total:
+    if duracion(fondo) < total - 0.05:   # margen de un fotograma y poco más
         print("   AVISO: el fondo dura menos que la voz. Faltan cortes en la lista.")
 
     musica = config["musica"] if config["musica"]["archivo"] else None
