@@ -153,6 +153,8 @@ vídeo en `data/revision/`.
 | `'NoneType' object has no attribute 'strip'` | Al índice le faltaba la columna `fuente` | `sed` para insertarla | El vigilante comprueba las columnas y dice qué línea falla |
 | Aviso "el fondo dura menos que la voz" | Diferencia de milésimas por el redondeo a fotogramas | Tolerancia de 0,05 s | |
 | Inicio con demasiado espacio | Umbral de -45 dB: contaba la respiración | Umbral y margen configurables | Medir con un bucle de umbrales |
+| Una grabación archivada podía desaparecer | Un audio nuevo con el mismo nombre se movía encima del de `data/archivo/` | El nuevo se guarda con la fecha y la hora en el nombre | Nunca mover un archivo sin comprobar antes si el destino existe |
+| Un archivo vacío frenaba la bandeja sin dejar rastro | `esta_completo()` esperaba 3 s en cada vuelta y lo descartaba en silencio | Saltarlo sin esperar y anotarlo una vez en el registro | Probar el vigilante con casos raros (vacíos, nombres repetidos) |
 | [Añade aquí otros problemas] | | | |
 
 Al editar código y datos: `git diff` antes de guardar enseña exactamente qué
@@ -214,6 +216,24 @@ de `du`]. Lo más pesado son los modelos de Whisper (1,9 GB), que se conservan.
 Comandos: `du -sh data/* | sort -h` para ver qué ocupa más, y `rm -rf` para
 borrar (es permanente: comprobar antes con `ls`).
 
+## Robustez del vigilante
+
+Dos casos raros que el vigilante no trataba bien:
+
+- **Nombre repetido**: si soltaba otra vez `002-caballo.wav`, `shutil.move`
+  lo movía encima de la grabación que ya estaba en `data/archivo/` y la
+  original se perdía. Ahora, si el destino ya existe, el nuevo se guarda
+  como `002-caballo_AAAAMMDD-HHMM.wav` y se anota en el registro. El short
+  sigue llamándose `002-caballo` y se rehace con la grabación nueva.
+- **Archivo vacío** (0 bytes): nunca se procesaba, pero en cada vuelta
+  `esta_completo()` esperaba 3 s para nada y no se anotaba en ningún sitio.
+  Ahora se salta sin esperar y aparece una sola línea `VACÍO` en
+  `data/registro.log`. Si después recibe contenido, se procesa con normalidad.
+
+Además se corrigió la descripción del script: el vídeo terminado se **mueve**
+a `data/revision/` (no se copia), como se explica en "Gestión del
+almacenamiento".
+
 ## Pendiente
 - Margen inicial configurable para los efectos (ninguno en los primeros
   segundos del gancho).
@@ -226,3 +246,5 @@ borrar (es permanente: comprobar antes con `ls`).
 ## Resuelto después de cerrar la fase
 - Limpieza automática de los archivos temporales (ver "Gestión del
   almacenamiento").
+- El vigilante ya no sobrescribe grabaciones archivadas e ignora los
+  archivos vacíos (ver "Robustez del vigilante").
