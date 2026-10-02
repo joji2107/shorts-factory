@@ -187,6 +187,33 @@ ha cambiado, y `git show` permite ver la línea que rompía un archivo.
   esconde (los 3 dB de la voz llevaban ahí desde la Fase 4).
 - [Añade aquí lo que tú sientas que has aprendido]
 
+## Gestión del almacenamiento
+
+Cada short dejaba varias copias del mismo material: 16 cortes sueltos, el
+fondo con los cortes unidos, la mezcla, y el vídeo final duplicado en
+`data/shorts/` y en `data/revision/`.
+
+Criterio: conservar las **fuentes originales** y lo que es caro de
+regenerar; borrar lo que se puede rehacer en poco tiempo.
+
+| Archivo | Qué pasa ahora |
+|---------|----------------|
+| `cortes/` | Se borra en cuanto se une en `fondo.mp4` |
+| `fondo.mp4`, `mezcla.wav` | El vigilante los borra al terminar el short |
+| `final.mp4` | El vigilante lo mueve a `revision/` (sin duplicar) |
+| `voz.wav` y los archivos de texto | Se conservan: permiten retocar sin volver a transcribir |
+| `data/archivo/` (grabaciones originales) | Se conserva siempre: es lo único insustituible |
+
+Contrapartida: retocar un short terminado obliga a regenerar el fondo
+(unos 2 o 3 minutos más).
+
+Limpieza de lo acumulado en las fases anteriores (`data/trabajo` 322 MB y
+`data/salida` 283 MB). Después, `data/` ocupa [completa con el resultado
+de `du`]. Lo más pesado son los modelos de Whisper (1,9 GB), que se conservan.
+
+Comandos: `du -sh data/* | sort -h` para ver qué ocupa más, y `rm -rf` para
+borrar (es permanente: comprobar antes con `ls`).
+
 ## Pendiente
 - Margen inicial configurable para los efectos (ninguno en los primeros
   segundos del gancho).
@@ -195,3 +222,7 @@ ha cambiado, y `git show` permite ver la línea que rompía un archivo.
 - Lanzar el vigilante en segundo plano para no ocupar una pestaña.
 - Fase 8: servidor MCP, Claude Code, búsqueda de clips con la API de Pexels y
   el guion diario.
+
+## Resuelto después de cerrar la fase
+- Limpieza automática de los archivos temporales (ver "Gestión del
+  almacenamiento").
