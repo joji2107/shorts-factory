@@ -76,10 +76,7 @@ def construir_grafo_audio(total, musica, efectos):
         entradas.append(f"[s{n}]")
 
     partes.append(
-        f"{''.join(entradas)}amix=inputs={len(entradas)}:duration=longest:normalize=0,"
-        # Limitador: deja los picos 4 dB por debajo del máximo para que la normalización
-        # final pueda ser lineal (una sola ganancia fija) sin pasarse del pico permitido
-        f"alimiter=limit=0.63:level=disabled[mezcla]"
+        f"{''.join(entradas)}amix=inputs={len(entradas)}:duration=longest:normalize=0[mezcla]"
     )
     return ";\n".join(partes)
 
@@ -92,7 +89,7 @@ def leer_json_final(texto):
 def medir_volumen(archivo, objetivo):
     """Primera pasada de loudnorm: mide el audio sin modificarlo."""
     resultado = ejecutar([
-        "ffmpeg", "-hide_banner", "-nostats", "-i", archivo,
+        "ffmpeg", "-hide_banner", "-nostats", "-i", archivo, "-vn",
         "-af", f"loudnorm={objetivo}:print_format=json", "-f", "null", "-",
     ])
     return leer_json_final(resultado.stderr)
@@ -128,23 +125,25 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
 
     # 2) Primera pasada: medir la mezcla
     objetivo = config["final"]["loudnorm"]
+    valores = dict(parte.split("=") for parte in objetivo.split(":"))   # {"I": "-14", "TP": "-2", ...}
     m = medir_volumen(mezcla_wav, objetivo)
 
-    # 3) Segunda pasada: corrección exacta con los valores medidos, y montaje con el vídeo
-    loudnorm = (
-        f"loudnorm={objetivo}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
-        f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
-        f"offset={m['target_offset']}:linear=true:print_format=json"
-    )
-    resultado = ejecutar([
-        "ffmpeg", "-hide_banner", "-nostats", "-y", "-i", fondo, "-i", mezcla_wav,
-        "-filter_complex", f"[0:v]ass={ass}[video];[1:a]{loudnorm}[audio]",
+    # 3) Segunda pasada: la ganancia exacta que falta hasta el objetivo, y un limitador
+    #    con el techo 1 dB por debajo del pico permitido (margen para la codificación AAC)
+    ganancia = float(valores["I"]) - float(m["input_i"])
+    techo = 10 ** ((float(valores["TP"]) - 1.0) / 20)   # de dB a valor lineal
+    audio = f"volume={ganancia:.2f}dB,alimiter=limit={techo:.4f}:level=disabled"
+    ejecutar([
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", fondo, "-i", mezcla_wav,
+        "-filter_complex", f"[0:v]ass={ass}[video];[1:a]{audio}[audio]",
         "-map", "[video]", "-map", "[audio]", "-t", f"{total:.3f}",
         "-c:v", "libx264", "-preset", "medium", "-crf", config["final"]["crf"],
         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         salida,
     ])
-    final = leer_json_final(resultado.stderr)
-    print(f"   volumen: {m['input_i']} LUFS -> {final['output_i']} LUFS "
-          f"(pico {final['output_tp']} dBTP, modo {final['normalization_type']})")
+
+    # 4) Comprobación: medir el archivo terminado
+    f = medir_volumen(salida, objetivo)
+    print(f"   volumen: mezcla {m['input_i']} LUFS, ganancia {ganancia:+.2f} dB "
+          f"-> final {f['input_i']} LUFS, pico {f['input_tp']} dBTP")
     print(f"   duración final: {total:.1f} s, {len(efectos)} efectos")
