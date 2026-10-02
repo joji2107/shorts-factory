@@ -51,7 +51,15 @@ def clips_por_tema(tema):
     """Busca en el índice de la biblioteca los vídeos con esa etiqueta."""
     indice = RAIZ / "biblioteca" / "indice.csv"
     with indice.open(encoding="utf-8-sig", newline="") as f:
-        filas = list(csv.DictReader(f))
+        lector = csv.DictReader(f)
+        filas = list(lector)
+    # Cada línea debe tener tantas columnas como la cabecera
+    for numero, fila in enumerate(filas, start=2):
+        if None in fila or None in fila.values():
+            raise RuntimeError(
+                f"La línea {numero} de biblioteca/indice.csv no tiene "
+                f"{len(lector.fieldnames)} columnas ({', '.join(lector.fieldnames)})"
+            )
     return [
         Path(fila["archivo"]).stem
         for fila in filas
