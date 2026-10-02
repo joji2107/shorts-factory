@@ -4,6 +4,7 @@ El render normaliza el volumen en dos pasadas: primero mezcla el audio y lo mide
 y después aplica la corrección exacta al montarlo con el vídeo.
 """
 import json
+import shutil
 
 from .utilidades import ejecutar, duracion
 
@@ -49,6 +50,8 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c):
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-f", "concat", "-safe", "0", "-i", archivo_lista, "-c", "copy", salida,
     ])
+    # Los cortes sueltos ya están dentro de fondo.mp4: no hace falta guardarlos
+    shutil.rmtree(carpeta)
 
 
 def construir_grafo_audio(total, musica, efectos):

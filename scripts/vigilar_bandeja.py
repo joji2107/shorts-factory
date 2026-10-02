@@ -93,6 +93,23 @@ def preparar_receta(nombre, audio, plantilla):
     ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+# Archivos de trabajo pesados que se borran al terminar un short. Se conservan
+# los pequeños (voz, palabras, subtítulos, listas de cortes y mezcla), que permiten
+# retocar el short después sin repetir la transcripción.
+PESADOS = ["fondo.mp4", "mezcla.wav"]
+
+
+def limpiar(nombre):
+    trabajo = DATA / "shorts" / nombre
+    liberado = 0
+    for archivo in PESADOS:
+        ruta = trabajo / archivo
+        if ruta.exists():
+            liberado += ruta.stat().st_size
+            ruta.unlink()
+    return liberado / 1_000_000
+
+
 def procesar(audio, plantilla):
     nombre = audio.stem
     archivado = ARCHIVO / audio.name
@@ -103,9 +120,11 @@ def procesar(audio, plantilla):
         preparar_receta(nombre, archivado, plantilla)
         final = crear(nombre, rehacer="voz")   # audio nuevo: se rehace todo desde la voz
         destino = REVISION / f"{nombre}.mp4"
-        shutil.copy2(final, destino)
+        shutil.move(final, destino)            # se mueve: el vídeo no queda duplicado
+        megas = limpiar(nombre)
         minutos = (time.perf_counter() - inicio) / 60
-        registrar(f"OK     {nombre} en {minutos:.1f} min -> {destino.relative_to(RAIZ)}")
+        registrar(f"OK     {nombre} en {minutos:.1f} min -> {destino.relative_to(RAIZ)} "
+                  f"({megas:.0f} MB de archivos temporales borrados)")
     except Exception as error:
         shutil.move(archivado, ERRORES / audio.name)
         (ERRORES / f"{nombre}.log").write_text(traceback.format_exc(), encoding="utf-8")
