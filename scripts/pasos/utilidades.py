@@ -10,3 +10,12 @@ def ejecutar(comando):
         print(resultado.stderr[-2000:])
         raise RuntimeError(f"Ha fallado el comando: {comando[0]}")
     return resultado
+
+
+def duracion(archivo):
+    """Devuelve la duración de un archivo de audio o vídeo, en segundos."""
+    resultado = ejecutar([
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration", "-of", "csv=p=0", archivo,
+    ])
+    return float(resultado.stdout.strip())

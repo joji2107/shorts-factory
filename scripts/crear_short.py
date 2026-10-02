@@ -1,6 +1,6 @@
 """Crea un short a partir de su configuración, paso a paso.
 
-Uso: python crear_short.py <nombre-del-short> [--desde PASO]
+Uso: python crear_short.py <nombre-del-short> [--rehacer PASO]
 """
 import argparse
 import json
@@ -10,9 +10,20 @@ from pathlib import Path
 from pasos.voz import procesar_voz
 from pasos.transcripcion import transcribir
 from pasos.subtitulos import generar_ass
+from pasos.cortes import crear_edl, elegir_efectos
+from pasos.montaje import generar_fondo, render
 
 RAIZ = Path(__file__).resolve().parent.parent   # la carpeta del proyecto
-PASOS = ["voz", "transcripcion", "subtitulos"]
+
+# Cada paso y los pasos de los que depende. El orden es el de ejecución.
+DEPENDE_DE = {
+    "voz": [],
+    "transcripcion": ["voz"],
+    "subtitulos": ["transcripcion"],
+    "fondo": ["transcripcion"],
+    "render": ["fondo", "voz", "subtitulos"],
+}
+PASOS = list(DEPENDE_DE)
 
 
 def fusionar(base, cambios):
@@ -36,28 +47,42 @@ def cargar_config(nombre):
 def main():
     parser = argparse.ArgumentParser(description="Crea un short paso a paso")
     parser.add_argument("short", help="Carpeta del short, por ejemplo 001-pulpo")
-    parser.add_argument("--desde", choices=PASOS, help="Rehacer a partir de este paso")
+    parser.add_argument("--rehacer", choices=PASOS,
+                        help="Rehace este paso y los que dependen de él")
     args = parser.parse_args()
 
     config = cargar_config(args.short)
+    receta = RAIZ / "shorts" / args.short
     trabajo = RAIZ / "data" / "shorts" / args.short
     trabajo.mkdir(parents=True, exist_ok=True)
+    biblioteca = RAIZ / "data" / "biblioteca" / "video"
+
+    # Con cortes escritos a mano, el fondo no depende de la voz
+    edl_manual = receta / "cortes.txt"
+    edl = edl_manual if edl_manual.exists() else trabajo / "cortes_auto.txt"
+    depende_de = dict(DEPENDE_DE)
+    if edl_manual.exists():
+        depende_de["fondo"] = []
 
     archivos = {
         "voz": trabajo / "voz.wav",
         "transcripcion": trabajo / "palabras.json",
         "subtitulos": trabajo / "subtitulos.ass",
+        "fondo": trabajo / "fondo.mp4",
+        "render": trabajo / "final.mp4",
     }
 
     inicio = time.perf_counter()
-    rehacer = False
+    rehechos = set()
     for paso in PASOS:
-        if args.desde == paso:
-            rehacer = True
-        if not rehacer and archivos[paso].exists():
+        necesario = (
+            paso == args.rehacer
+            or not archivos[paso].exists()
+            or any(dep in rehechos for dep in depende_de[paso])
+        )
+        if not necesario:
             print(f"== {paso}: ya existe, se salta")
             continue
-        rehacer = True   # si un paso se rehace, todos los siguientes también
         print(f"== {paso}")
 
         if paso == "voz":
@@ -67,6 +92,19 @@ def main():
                         archivos["transcripcion"], config["transcripcion"])
         elif paso == "subtitulos":
             generar_ass(archivos["transcripcion"], archivos["subtitulos"], config["subtitulos"])
+        elif paso == "fondo":
+            if not edl_manual.exists():
+                crear_edl(archivos["transcripcion"], archivos["voz"], edl, biblioteca, config)
+            generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"])
+        elif paso == "render":
+            # Efectos escritos a mano en la configuración, o elegidos automáticamente
+            efectos = config["efectos"]["lista"]
+            if not efectos and config["efectos"]["automaticos"] > 0:
+                efectos = elegir_efectos(edl, archivos["transcripcion"], config)
+            render(archivos["fondo"], archivos["voz"], archivos["subtitulos"],
+                   trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos)
+
+        rehechos.add(paso)
 
     print(f"\nListo en {time.perf_counter() - inicio:.1f} s. Resultados en {trabajo}")
 

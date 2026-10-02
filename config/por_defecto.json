@@ -14,5 +14,37 @@
     "fuente": "DejaVu Sans",
     "tamano": 80,
     "margen_vertical": 560
+  },
+  "video": {
+    "segundos_corte": 3,
+    "encuadre": "desenfocado",
+    "corte_min": 1.5,
+    "corte_max": 4.0,
+    "pausa_corte": 0.15,
+    "clips": []
+  },
+  "musica": {
+    "archivo": null,
+    "inicio": 0,
+    "volumen": 0.25,
+    "fundido_entrada": 1,
+    "fundido_salida": 1.6,
+    "umbral_ducking": 0.03,
+    "ratio_ducking": 6,
+    "ataque_ducking": 20,
+    "relajacion_ducking": 400
+  },
+  "efectos": {
+    "volumen": 0.25,
+    "lista": [],
+    "automaticos": 0,
+    "archivos": [],
+    "separacion_min": 8.0
+  },	
+  },
+  "final": {
+    "cola": 1.0,
+    "loudnorm": "I=-14:TP=-2:LRA=11",
+    "crf": 20
   }
 }
