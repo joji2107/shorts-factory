@@ -26,16 +26,16 @@
   "musica": {
     "archivo": null,
     "inicio": 0,
-    "volumen": 0.25,
+    "volumen": 0.35,
     "fundido_entrada": 1,
     "fundido_salida": 1.6,
-    "umbral_ducking": 0.03,
+    "umbral_ducking": 0.042,
     "ratio_ducking": 6,
     "ataque_ducking": 20,
     "relajacion_ducking": 400
   },
   "efectos": {
-    "volumen": 0.25,
+    "volumen": 0.35,
     "lista": [],
     "automaticos": 0,
     "archivos": [],

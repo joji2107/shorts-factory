@@ -76,7 +76,10 @@ def construir_grafo_audio(total, musica, efectos):
         entradas.append(f"[s{n}]")
 
     partes.append(
-        f"{''.join(entradas)}amix=inputs={len(entradas)}:duration=longest:normalize=0[mezcla]"
+        f"{''.join(entradas)}amix=inputs={len(entradas)}:duration=longest:normalize=0,"
+        # Limitador: deja los picos 4 dB por debajo del máximo para que la normalización
+        # final pueda ser lineal (una sola ganancia fija) sin pasarse del pico permitido
+        f"alimiter=limit=0.63:level=disabled[mezcla]"
     )
     return ";\n".join(partes)
 
