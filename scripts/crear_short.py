@@ -44,16 +44,11 @@ def cargar_config(nombre):
     return fusionar(base, propia)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Crea un short paso a paso")
-    parser.add_argument("short", help="Carpeta del short, por ejemplo 001-pulpo")
-    parser.add_argument("--rehacer", choices=PASOS,
-                        help="Rehace este paso y los que dependen de él")
-    args = parser.parse_args()
-
-    config = cargar_config(args.short)
-    receta = RAIZ / "shorts" / args.short
-    trabajo = RAIZ / "data" / "shorts" / args.short
+def crear(nombre, rehacer=None):
+    """Crea (o actualiza) el short 'nombre' y devuelve la ruta del vídeo final."""
+    config = cargar_config(nombre)
+    receta = RAIZ / "shorts" / nombre
+    trabajo = RAIZ / "data" / "shorts" / nombre
     trabajo.mkdir(parents=True, exist_ok=True)
     biblioteca = RAIZ / "data" / "biblioteca" / "video"
 
@@ -76,7 +71,7 @@ def main():
     rehechos = set()
     for paso in PASOS:
         necesario = (
-            paso == args.rehacer
+            paso == rehacer
             or not archivos[paso].exists()
             or any(dep in rehechos for dep in depende_de[paso])
         )
@@ -107,6 +102,16 @@ def main():
         rehechos.add(paso)
 
     print(f"\nListo en {time.perf_counter() - inicio:.1f} s. Resultados en {trabajo}")
+    return archivos["render"]
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Crea un short paso a paso")
+    parser.add_argument("short", help="Carpeta del short, por ejemplo 001-pulpo")
+    parser.add_argument("--rehacer", choices=PASOS,
+                        help="Rehace este paso y los que dependen de él")
+    args = parser.parse_args()
+    crear(args.short, args.rehacer)
 
 
 if __name__ == "__main__":

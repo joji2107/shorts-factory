@@ -1,0 +1,15 @@
+{
+  "voz": {
+    "inicio": "auto"
+  },
+  "musica": {
+    "archivo": "data/biblioteca/musica/curiosidad_01.mp3"
+  },
+  "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ]
+  }
+}
