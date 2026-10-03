@@ -111,13 +111,22 @@ def medir_volumen(archivo, objetivo):
     return leer_json_final(resultado.stderr)
 
 
-def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
-    """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos."""
-    total = duracion(voz) + config["final"]["cola"]
+def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_ultima_palabra=None):
+    """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos.
+    fin_ultima_palabra: segundo en que acaba la última palabra (de la transcripción)."""
+    tras = config["final"].get("tras_ultima_palabra")
+    if tras is not None and fin_ultima_palabra is not None:
+        # Bucle: el vídeo acaba poco después de la última palabra para enlazar con la primera
+        total = fin_ultima_palabra + tras
+    else:
+        total = duracion(voz) + config["final"]["cola"]
     if duracion(fondo) < total - 0.05:   # margen de un fotograma y poco más
         print("   AVISO: el fondo dura menos que la voz. Faltan cortes en la lista.")
 
-    musica = config["musica"] if config["musica"]["archivo"] else None
+    musica = dict(config["musica"]) if config["musica"]["archivo"] else None
+    if musica and fin_ultima_palabra is not None:
+        # El fundido de salida de la música no empieza antes de la última palabra
+        musica["fundido_salida"] = round(min(musica["fundido_salida"], total - fin_ultima_palabra), 3)
     entradas = ["-i", voz]
     if musica:
         entradas += ["-ss", musica["inicio"], "-t", f"{total:.3f}", "-i", raiz / musica["archivo"]]
@@ -168,4 +177,5 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
     f = medir_volumen(salida, objetivo)
     print(f"   volumen: mezcla {m['input_i']} LUFS, ganancia {ganancia:+.2f} dB "
           f"-> final {f['input_i']} LUFS, pico {f['input_tp']} dBTP")
-    print(f"   duración final: {total:.1f} s, {len(efectos)} efectos")
+    fundido = f", fundido de la música {musica['fundido_salida']:g} s" if musica else ""
+    print(f"   duración final: {total:.1f} s, {len(efectos)} efectos{fundido}")

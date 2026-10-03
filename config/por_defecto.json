@@ -18,7 +18,9 @@
     "color_contorno": "#14213D",
     "contorno": 7,
     "resaltar_negritas": true,
-    "color_resaltado": "#FFC93C"
+    "corregir_con_guion": true,
+    "color_resaltado": "#FFC93C",
+    "duracion_min": 0.7
   },
   "video": {
     "segundos_corte": 3,
@@ -26,6 +28,7 @@
     "corte_min": 1.5,
     "corte_max": 4.0,
     "pausa_corte": 0.15,
+    "buscar_destellos": false,
     "clips": []
   },
   "musica": {
@@ -50,6 +53,7 @@
   },
   "final": {
     "cola": 2.5,
+    "tras_ultima_palabra": null,
     "loudnorm": "I=-14:TP=-2:LRA=11",
     "crf": 20
   }

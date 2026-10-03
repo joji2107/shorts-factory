@@ -10,8 +10,10 @@ y una pregunta que invite a comentar.
 
 | Parte | Qué se hizo | Commit |
 |---|---|---|
-| 1 | Textos de publicación en la skill `guion-short` y `scripts/creditos.py` | |
-| 2 | Subtítulos con los colores de la marca y resaltado de las negritas del guion | |
+| 1 | Textos de publicación en la skill `guion-short` y `scripts/creditos.py` | `580af6c` |
+| 2 | Subtítulos con los colores de la marca y resaltado de las negritas del guion | `9a0c07e` |
+| 3 | Hoja para leer el guion (`scripts/para_leer.py`) y short 003-rayo | |
+| 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | |
 
 ---
 
@@ -161,6 +163,83 @@ Implicaría el doble de líneas en el `.ass` y cajas rectangulares (sin esquinas
 redondeadas). Azul sobre amarillo se lee muy bien (10,4:1). Decisión: se deja para
 más adelante y, antes de programarlo, se prueba el truco con un fotograma suelto.
 
+## Parte 3: hoja para leer el guion
+
+Antes de grabar, siempre se abre una hoja con el guion y cómo leerlo, como la que se
+hizo a mano para 002-caballo. Ahora la genera `scripts/para_leer.py` a partir de
+`guion.md`, para que nunca se desfase del guion:
+
+```bash
+docker run --rm -t -v "$PWD:/proyecto" shorts-whisper python /proyecto/scripts/para_leer.py 003-rayo
+open shorts/003-rayo/para_leer.html
+```
+
+- Una frase por línea. Una `(pausa)` va con la frase anterior, y unos puntos
+  suspensivos seguidos de minúscula ("soñar... hasta") no cortan la frase.
+- La **negrita** sale en color y las `(pausa)` en gris, para no leerlas.
+- Arriba: nombre de la grabación, palabras, duración estimada y las notas de lectura
+  (las líneas `>` de la cabecera de `guion.md`, como la del final de un bucle).
+
+Comprobación: generada para 002-caballo, solo se diferencia de la hecha a mano en la
+duración redondeada (46 s en vez de 45) y una línea de estilo para las notas.
+
+## Parte 4: correcciones del 003-rayo
+
+Al revisar la primera versión salieron varios problemas. Cada uno se arregló en la
+causa, no solo en este short.
+
+### Clips: casi todos de IA y muchos sin rayo
+- `buscar_clips` se quedaba con los primeros resultados de Pixabay, que devuelve
+  también vídeos que solo se parecen a la búsqueda (piedras, cielos estrellados, un
+  corazón en la playa al buscar rayos), y priorizaba los verticales, que en Pixabay
+  son casi siempre IA. Los rayos grabados de verdad suelen ser horizontales.
+- La respuesta de la API trae un campo `isAiGenerated` que **no sale en la
+  documentación**. Marcaba bien 7 de los 16 primeros clips, pero no es infalible.
+- Ahora: `buscar_clips` exige la primera palabra de la búsqueda en las etiquetas del
+  vídeo, pone primero los que no son IA y registra los de IA con la etiqueta `ia`
+  (`elegir_clips` los deja para el final). Herramienta nueva `ver_candidatos`: enseña
+  los candidatos y sus miniaturas **sin descargar**, y `buscar_clips(ids=...)` descarga
+  solo los elegidos.
+- En las tormentas reales casi todo el tiempo está oscuro y el rayo dura un instante:
+  muchos cortes caían en negro. Con `video.buscar_destellos`, `cortes.py` mide el
+  brillo de cada fotograma (`signalstats`) y mueve cada corte para que empiece 0,4 s
+  antes de un destello: 12 de 13 cortes con rayo.
+- Quedan en la biblioteca 16 clips de rayo que no sirven (no se pueden borrar): se
+  usan los 6 nuevos grabados de verdad (`rayo_17` a `rayo_20`, `rayo_22`, `rayo_23`) y
+  `rayo_05` (IA, con un rayo muy claro).
+
+### El efecto de error, a destiempo
+`error_01.mp3` empieza con 0,6 s de silencio, así que sonaba 0,6 s después de la
+palabra. `anclar_a_palabras()` resta ahora el silencio inicial de cada efecto
+(`silencio_inicial()`, con `silencedetect`). Además, un sonido de error es de broma: en
+un short serio queda mal, así que se quitó del 003 y la skill lo reserva para guiones
+de tono divertido.
+
+### El final del bucle
+El vídeo acababa casi 3 s después de la última palabra (2,5 s de cola más el silencio
+del final de `voz.wav`) y el bucle no enlazaba. Con `final.tras_ultima_palabra: 0.5`
+acaba medio segundo después de la última palabra transcrita, y el fundido de salida
+de la música ya no empieza nunca antes de la última palabra (aquí, 0,5 s).
+
+### Subtítulos
+- Whisper escribe las cifras con dígitos («30.000», «20»): las negritas «treinta mil»
+  y «veinte» no se resaltaban. Un tramo distinto en el que todo el guion va en negrita
+  se resalta igual.
+- Whisper partía «30.000» en «30» y «.000,»: `unir_cifras()` los junta.
+- «Eso que oyes» salía «Eso qué hay». Se probó a darle el guion a Whisper como pista
+  (`initial_prompt`): con el guion entero se quedaba sin memoria (código 137) y con
+  medio guion **se saltó 36 palabras e inventó una frase**. Se descartó. Ahora los
+  subtítulos se corrigen con el guion (`corregir_con_guion`): en los tramos iguales se
+  usa la forma escrita del guion (tildes y puntuación) y en los distintos, si se
+  parecen lo bastante o son 1-2 palabras entre tramos iguales, el texto del guion con
+  los tiempos de Whisper. En 002-caballo encontró dos errores que ya estaban en su
+  vídeo: «un ochado» (uno echado) y «no le despiertes» (no lo despiertes).
+- La última palabra, «está», duraba 0,1 s: cada subtítulo dura ahora al menos
+  `subtitulos.duracion_min` (0,7 s) sin pisar el siguiente.
+
+Resultado: 37,3 s (0,5 s tras la última palabra), -14,49 LUFS, 2 efectos. La primera
+versión queda en `data/pruebas/003-rayo_v1.mp4`.
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -173,6 +252,13 @@ más adelante y, antes de programarlo, se prueba el truco con un fotograma suelt
 | Buscar cada negrita suelta resaltaría todas las veces que sale esa palabra | "no", "todos" o "soñar" se repiten en el guion | Alinear guion y transcripción con `difflib` | |
 | El paso de subtítulos no se entera de que cambian las negritas | Solo depende de la transcripción | `--rehacer subtitulos` | Anotado en la skill |
 | `awk` daba los tiempos de los cortes redondeados | Con el idioma del Mac, `awk` espera coma decimal | `LC_ALL=C awk ...` | |
+| Con 6 clips de rayo, `evaluar_material` decía "justo" y pedía uno más (003-rayo) | La skill le pasaba la duración estimada (con la cola) y la herramienta vuelve a sumar la cola: 47 s en vez de 44,4 | Pasarle la duración de la voz (palabras / velocidad); con 41,9 s, "suficiente" | Skill, docstring de la herramienta y `CLAUDE.md` dicen que es sin la cola |
+| `buscar_clips` descargó clips sin rayo o hechos con IA | Se quedaba con los primeros resultados de Pixabay, que mezcla vídeos parecidos, y priorizaba los verticales | Palabra clave en las etiquetas, primero los que no son IA, `ver_candidatos` con miniaturas y descarga por `ids` | Mirar las miniaturas antes de descargar: lo que entra en la biblioteca no se borra |
+| Cortes de tormenta en negro | En lo grabado de verdad, el rayo dura un instante | `video.buscar_destellos`: cada corte empieza antes de un destello | La skill lo pide para temas de un instante |
+| El efecto de error sonaba tarde | `error_01.mp3` empieza con 0,6 s de silencio | Restar el silencio inicial al anclar a una palabra | Medir los efectos nuevos con `silencedetect` |
+| El bucle no enlazaba | El vídeo acababa casi 3 s después de la última palabra | `final.tras_ultima_palabra` y fundido de la música que no empieza antes de la última palabra | La skill lo pone en los guiones con bucle |
+| «Eso qué hay» en vez de «Eso que oyes» | Whisper lo oyó mal | Corregir los subtítulos con el guion | El guion como pista de Whisper no sirve (se salta frases) |
+| La transcripción murió sin mensaje | `grep` ocultaba el código de salida; era 137 (sin memoria) | Guardar la salida en un archivo y mirar `$?` | No filtrar con tuberías los comandos largos |
 | [Añade aquí otros problemas] | | | |
 
 ## Herramientas aprendidas
@@ -187,6 +273,10 @@ más adelante y, antes de programarlo, se prueba el truco con un fotograma suelt
 | `unicodedata.normalize("NFD")` | Separar las tildes de las letras para quitarlas |
 | `{\1c&HBBGGRR&}` y `{\r}` en ASS | Cambiar el color de una palabra y volver al estilo |
 | `ffmpeg ... split, hstack, drawtext` | Poner dos versiones de un fotograma lado a lado con su nombre |
+| `signalstats` (`YAVG`) | Brillo medio de cada fotograma: encontrar los destellos de un rayo |
+| `xstack` | Hojas de contactos con varios fotogramas o miniaturas |
+| `silencedetect` | Medir el silencio del principio de un efecto |
+| Código de salida 137 | El sistema mató el proceso por falta de memoria |
 
 ## Mis conclusiones
 - [Añade aquí qué te parece escribir títulos con curiosidad sin caer en el engaño]
@@ -195,8 +285,9 @@ más adelante y, antes de programarlo, se prueba el truco con un fotograma suelt
 
 ## Pendiente
 - Publicar 001-pulpo y, al día siguiente, 002-caballo.
-- Decidir si se publica el 002-caballo nuevo (colores de la marca, en
-  `data/shorts/002-caballo/final.mp4`) en lugar del de `data/listos/`.
+- Decidir si se publica el 002-caballo nuevo (colores de la marca y subtítulos
+  corregidos con el guion, en `data/revision/002-caballo.mp4`) en lugar del de `data/listos/`.
+- Reconectar el servidor MCP en Claude Code (`/mcp`) para que aparezca `ver_candidatos`.
 - Probar el marcador amarillo con un fotograma suelto (parte 2).
 - 001-pulpo no tiene negritas en el guion: si se quieren palabras en amarillo, hay
   que marcarlas y rehacer sus subtítulos.

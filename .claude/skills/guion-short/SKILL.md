@@ -103,6 +103,9 @@ tema va en singular, minúsculas, sin tildes y con `_` entre palabras
 **Palabras:** N · **Duración estimada:** X s (velocidad X palabras/s + 2,5 s de cola)
 **Música:** <archivo> · **Efectos:** <archivos y dónde suenan (palabra o automático)>
 
+> <opcional: nota de lectura, si hay algo especial (el final de un bucle, una
+> palabra difícil...). Sale arriba en la hoja para leer.>
+
 ## Guion
 **Gancho:** ...
 **Dato:** ...
@@ -162,20 +165,54 @@ Tipos:
 - `whoosh`: cambio de bloque (del dato al giro, del giro al remate)
 - `riser`: tensión antes del giro o de un dato sorprendente
 - `ding`: un dato curioso o una idea
-- `error`: un mito desmentido o algo que "falla"
+- `error`: un mito desmentido o algo que "falla". Es un sonido de broma: solo en
+  guiones de tono divertido (música `alegria`). En uno serio o de misterio queda mal
+  (en 003-rayo hubo que quitarlo).
+
+**Bucle**: si la técnica es *bucle*, el vídeo tiene que acabar justo después de la
+última palabra para que enlace con la primera. Pon en `config.json`
+`"final": {"tras_ultima_palabra": 0.5}`: el vídeo acaba 0,5 s después de la última
+palabra (en vez de 2,5 s de cola) y la música se funde en ese medio segundo.
 
 ## 3. Material
 
-1. `evaluar_material(tema, duración estimada)`.
+1. `evaluar_material(tema, duración de la voz)`: palabras / `palabras_por_segundo`,
+   **sin la cola**, porque la herramienta ya la suma (si se le pasa la duración
+   estimada, la cola se cuenta dos veces y pide clips de más).
 2. Si no es *suficiente*, di cuántos clips faltan y **pide permiso** antes de
-   descargar. Con permiso: `buscar_clips` con la `cantidad` que diga
-   `evaluar_material` (máximo 5 por llamada), la búsqueda en inglés y, si el tema
-   es nuevo, una o dos `etiquetas_generales` en singular y sin tildes.
+   descargar. Con permiso:
+   - `ver_candidatos(búsqueda en inglés)`: no descarga nada. La primera palabra de
+     la búsqueda tiene que estar en las etiquetas del vídeo. Prueba también
+     `orientacion="horizontal"`: lo grabado de verdad suele ser horizontal y en
+     vertical abunda la IA.
+   - **Mira las miniaturas** (`data/cache/miniaturas/`): que se vea el tema de
+     verdad y que no sea todo IA o animación 3D (la marca de IA de Pixabay falla a
+     veces). Algún clip de IA vale, pero no puede ser la norma: como mucho 1 de cada
+     6-7 clips del short (como en 003-rayo, que el usuario dio por perfecto).
+   - `buscar_clips(tema, ids="id1,id2")` con los elegidos (máximo 5 por llamada) y,
+     si el tema es nuevo, una o dos `etiquetas_generales` en singular y sin tildes.
+   - Después, comprueba los clips descargados con fotogramas: lo que entra en la
+     biblioteca ya no se puede borrar.
+   - Si el tema es algo que dura un instante (rayos, relámpagos, fuegos
+     artificiales), pon `"video": {"buscar_destellos": true}` en `config.json`:
+     cada corte empieza justo antes de un destello. Si no, en un clip de tormenta
+     de 50 s casi todos los cortes caen en negro.
 3. Vuelve a ejecutar `evaluar_material` para confirmar. Si sigue sin llegar (no hay
    más vídeos en Pixabay, por ejemplo), dilo: el short se puede hacer, pero
    repetirá planos.
 
 ## 4. Cierre
+
+**Hoja para leer (siempre, antes de arrancar el vigilante):** genera la hoja con el
+guion y cómo leerlo y ábresela al usuario:
+
+```bash
+docker run --rm -t -v "$PWD:/proyecto" shorts-whisper python /proyecto/scripts/para_leer.py NNN-tema
+open shorts/NNN-tema/para_leer.html
+```
+
+Sale de `guion.md` (una frase por línea, la negrita en color, las pausas en gris y
+las notas `>` de la cabecera arriba), así que si el guion cambia, vuelve a generarla.
 
 Dile al usuario:
 - El nombre exacto de la grabación: `NNN-tema.wav` (también vale .mp3, .m4a, .aif),

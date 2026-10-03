@@ -14,11 +14,19 @@ Versión 3:
 Versión 4:
 - El reparto (repartir) no imprime nada, para poder simularlo desde el servidor MCP.
 - Cada clip empieza en un punto al azar (desplazar), no siempre en el segundo 0.
+
+Versión 5:
+- Con video.buscar_destellos, cada corte se mueve para que un destello (un rayo) caiga
+  al principio del plano: en las tormentas grabadas de verdad casi todo el tiempo está
+  oscuro y, con un punto al azar, muchos cortes salían sin rayo.
+- Con final.tras_ultima_palabra (bucle), los cortes llegan hasta ahí y no más.
 """
 import json
 import random
+import re
+import statistics
 
-from .utilidades import duracion
+from .utilidades import duracion, ejecutar
 
 FPS = 30
 MARGEN = 0.5        # segundos que se saltan entre dos usos de un clip, para no repetir plano
@@ -132,14 +140,74 @@ def desplazar(edl, duraciones, azar=random):
     return [(clip, inicio + desfase[clip], largo) for clip, inicio, largo in edl]
 
 
+def destellos(video):
+    """Segundos en que el clip se ilumina de golpe (un rayo): fotogramas con un brillo
+    medio (YAVG de signalstats, a 10 por segundo) de al menos 1,5 veces el típico del
+    clip y 15 puntos más. Los que van seguidos (menos de 1 s) cuentan como uno."""
+    resultado = ejecutar([
+        "ffmpeg", "-hide_banner", "-i", video, "-an",
+        "-vf", "scale=160:-2,fps=10,signalstats,metadata=print:key=lavfi.signalstats.YAVG",
+        "-f", "null", "-",
+    ])
+    tiempos = [float(t) for t in re.findall(r"pts_time:([\d.]+)", resultado.stderr)]
+    brillos = [float(y) for y in re.findall(r"YAVG=([\d.]+)", resultado.stderr)]
+    if not brillos:
+        return []
+    tipico = statistics.median(brillos)
+    encontrados, ultimo = [], -9.0
+    for t, brillo in zip(tiempos, brillos):
+        if brillo > max(tipico * 1.5, tipico + 15) and t - ultimo > 1:
+            encontrados.append(t)
+            ultimo = t
+    return encontrados
+
+
+def a_destellos(edl, biblioteca, duraciones, antes=0.4):
+    """Mueve cada corte para que empiece 'antes' segundos antes de un destello de su
+    clip. Cada destello se usa una vez y dos tramos de un mismo clip no se pisan (con
+    MARGEN). Si un clip no tiene destellos libres, el corte se queda donde estaba (o en
+    el primer hueco libre, si ahí pisaría a otro)."""
+    pendientes = {clip: destellos(biblioteca / f"{clip}.mp4") for clip in {clip for clip, _, _ in edl}}
+    usados, resultado, con_rayo = {}, [], 0
+
+    def libre(clip, inicio, largo):
+        return (0 <= inicio and inicio + largo <= duraciones[clip] and
+                all(inicio >= fin + MARGEN or inicio + largo + MARGEN <= ini for ini, fin in usados.get(clip, [])))
+
+    for clip, inicio, largo in edl:
+        elegido = None
+        for t in pendientes[clip]:
+            candidato = a_fotograma(max(0.0, t - antes))
+            if libre(clip, candidato, largo):
+                elegido = candidato
+                pendientes[clip].remove(t)
+                con_rayo += 1
+                break
+        if elegido is None:
+            huecos_libres = (a_fotograma(x / 2) for x in range(int((duraciones[clip] - largo) * 2) + 1))
+            elegido = inicio if libre(clip, inicio, largo) else next(
+                (x for x in huecos_libres if libre(clip, x, largo)), inicio)
+        usados.setdefault(clip, []).append((elegido, elegido + largo))
+        resultado.append((clip, elegido, largo))
+    print(f"   {con_rayo} de {len(edl)} cortes empiezan en un destello")
+    return resultado
+
+
 def crear_edl(json_palabras, voz, salida, biblioteca, config):
     c = config["video"]
     if not c["clips"]:
         raise RuntimeError("No hay cortes.txt en la receta ni lista de 'clips' en la configuración")
     palabras = json.loads(json_palabras.read_text(encoding="utf-8"))
-    total = duracion(voz) + config["final"]["cola"]
+    tras = config["final"].get("tras_ultima_palabra")
+    if tras is not None and palabras:
+        total = palabras[-1]["fin"] + tras          # bucle: el vídeo acaba ahí (como en render)
+    else:
+        total = duracion(voz) + config["final"]["cola"]
     puntos = puntos_de_corte(palabras, total, c)
     edl = asignar_clips(puntos, c["clips"], biblioteca)
+    if c.get("buscar_destellos"):
+        duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in c["clips"]}
+        edl = a_destellos(edl, biblioteca, duraciones)
     salida.write_text(
         "".join(f"{clip} {inicio:.3f} {largo:.4f}\n" for clip, inicio, largo in edl),
         encoding="utf-8",

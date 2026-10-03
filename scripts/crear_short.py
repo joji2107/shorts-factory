@@ -12,7 +12,7 @@ from pasos.transcripcion import transcribir
 from pasos.subtitulos import generar_ass
 from pasos.cortes import crear_edl, elegir_efectos
 from pasos.montaje import generar_fondo, render
-from pasos.utilidades import duracion
+from pasos.utilidades import duracion, silencio_inicial
 
 RAIZ = Path(__file__).resolve().parent.parent   # la carpeta del proyecto
 
@@ -41,7 +41,9 @@ def fusionar(base, cambios):
 def anclar_a_palabras(efectos, json_palabras):
     """Los efectos con "palabra" (y "vez", si se repite: 1 la primera) empiezan justo al
     terminar esa palabra. Así siguen en su sitio aunque se vuelva a grabar la voz;
-    los que llevan "momento" (segundo exacto, en el centro del efecto) no cambian."""
+    los que llevan "momento" (segundo exacto, en el centro del efecto) no cambian.
+    Si el archivo empieza con silencio, se adelanta ese silencio: lo que tiene que
+    empezar al terminar la palabra es el sonido, no el archivo."""
     def limpia(texto):
         return texto.lower().strip("¿?¡!.,;:…\"'«»()")
 
@@ -55,7 +57,8 @@ def anclar_a_palabras(efectos, json_palabras):
                 raise RuntimeError(f"La palabra '{efecto['palabra']}' (vez {vez}) del efecto "
                                    f"{efecto['archivo']} no está en la transcripción")
             # render centra cada efecto en su momento: medio efecto después del final de la palabra
-            momento = finales[vez - 1] + duracion(RAIZ / efecto["archivo"]) / 2
+            archivo = RAIZ / efecto["archivo"]
+            momento = finales[vez - 1] + duracion(archivo) / 2 - silencio_inicial(archivo)
             print(f"   efecto {Path(efecto['archivo']).name} tras «{efecto['palabra']}» ({finales[vez - 1]:.2f} s)")
             efecto = {**efecto, "momento": momento}
         resultado.append(efecto)
@@ -127,8 +130,10 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
             efectos = anclar_a_palabras(config["efectos"]["lista"], archivos["transcripcion"])
             if not efectos and config["efectos"]["automaticos"] > 0:
                 efectos = elegir_efectos(edl, archivos["transcripcion"], config)
+            palabras = json.loads(archivos["transcripcion"].read_text(encoding="utf-8"))
             render(archivos["fondo"], archivos["voz"], archivos["subtitulos"],
-                   trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos)
+                   trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos,
+                   palabras[-1]["fin"] if palabras else None)
 
         rehechos.add(paso)
 

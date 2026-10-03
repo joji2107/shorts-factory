@@ -51,6 +51,15 @@ def clips_del_tema(tema, filas=None):
     ]
 
 
+def clips_ia(filas=None):
+    """Los vídeos del índice con la etiqueta 'ia' (generados con inteligencia artificial)."""
+    return {
+        Path(fila["archivo"]).stem
+        for fila in (filas if filas is not None else leer_indice())
+        if "ia" in fila["etiquetas"].strip().split(";")
+    }
+
+
 def configuracion(plantilla="curiosidades"):
     """La configuración que tendrá un short nuevo: por defecto + plantilla."""
     base = json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8"))
@@ -120,13 +129,16 @@ def clips_que_faltan(durs, total, video):
 
 
 def elegir_clips(tema, total, config, azar=random):
-    """Los clips justos para el short, empezando por los menos usados (al azar entre
-    los empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos."""
-    candidatos = clips_del_tema(tema)
+    """Los clips justos para el short: primero los que no son IA (un short hecho solo
+    con clips de IA queda pobre) y, entre ellos, los menos usados (al azar entre los
+    empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos."""
+    filas = leer_indice()
+    candidatos = clips_del_tema(tema, filas)
     if not candidatos:
         return [], "insuficiente"
     shorts, cortes = usos()
-    candidatos.sort(key=lambda clip: (shorts[clip], cortes[clip], azar.random()))
+    ia = clips_ia(filas)
+    candidatos.sort(key=lambda clip: (clip in ia, shorts[clip], cortes[clip], azar.random()))
     durs = duraciones(candidatos)
     for cuantos in range(min(MIN_CLIPS, len(candidatos)), len(candidatos) + 1):
         elegidos = candidatos[:cuantos]

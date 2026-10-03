@@ -4,6 +4,12 @@ Las palabras que el guion (shorts/<nombre>/guion.md) marca en **negrita** salen 
 el color de resaltado. Para saber cuáles son se alinea el texto del guion con la
 transcripción (difflib), en vez de buscar cada palabra suelta: así, si "no" va en
 negrita una sola vez, no se resaltan todos los "no" del vídeo.
+
+Con la misma alineación se corrigen los errores de Whisper: si un tramo de la
+transcripción tiene tantas palabras como el del guion y se parece lo bastante ("Eso
+qué hay después" / "Eso que oyes después"), se muestra el texto del guion con los
+tiempos de Whisper. Si es muy distinto (una frase improvisada), se deja lo que se dijo.
+palabras.json no cambia: solo lo que sale en pantalla.
 """
 import difflib
 import json
@@ -11,6 +17,7 @@ import re
 import unicodedata
 
 FIN_FRASE = (".", "?", "!", ",", ";", ":")
+PARECIDO_MIN = 0.5      # parecido mínimo (de 0 a 1) para corregir un tramo con el guion
 
 
 def color_ass(web):
@@ -29,36 +36,95 @@ def normalizar(palabra):
 
 
 def palabras_del_guion(ruta):
-    """Las palabras que se dicen en el guion, normalizadas, con True si van en negrita.
+    """Las palabras que se dicen en el guion: (normalizada, True si va en negrita, tal cual).
     Solo cuenta la sección '## Guion', sin las etiquetas (**Gancho:**) ni las (pausa)."""
     seccion = re.search(r"^## Guion\s*$(.*?)(?=^## |\Z)", ruta.read_text(encoding="utf-8"), re.M | re.S)
     if not seccion:
         return []
     texto = re.sub(r"^\*\*[^*\n]+:\*\*", " ", seccion.group(1), flags=re.M)
     texto = re.sub(r"\(pausa\)", " ", texto, flags=re.I)
-    resultado = []
-    # Al partir por "**", los trozos impares son los que estaban entre asteriscos
-    for n, trozo in enumerate(texto.split("**")):
-        for palabra in trozo.split():
-            if normalizar(palabra):
-                resultado.append((normalizar(palabra), n % 2 == 1))
+    resultado, negrita = [], False
+    for trozo in texto.split():
+        # Cada "**" abre o cierra la negrita; la puntuación se queda pegada ("**rayo**." -> "rayo.")
+        palabra, en_negrita, i = "", None, 0
+        while i < len(trozo):
+            if trozo.startswith("**", i):
+                negrita, i = not negrita, i + 2
+                continue
+            if en_negrita is None and trozo[i].isalnum():
+                en_negrita = negrita
+            palabra, i = palabra + trozo[i], i + 1
+        if normalizar(palabra):
+            resultado.append((normalizar(palabra), bool(en_negrita), palabra))
     return resultado
 
 
-def indices_resaltados(palabras, ruta_guion):
-    """Las posiciones de la transcripción que corresponden a palabras en negrita del
-    guion, y cuántas palabras en negrita tiene el guion."""
-    guion = palabras_del_guion(ruta_guion)
+def alinear(palabras, guion):
+    """Alinea el guion con la transcripción. Devuelve las palabras transcritas que cuentan,
+    como (posición, normalizada), y los tramos de difflib (operación, a1, a2, b1, b2):
+    guion[a1:a2] corresponde a transcritas[b1:b2]."""
     transcritas = [(i, normalizar(p["palabra"])) for i, p in enumerate(palabras)]
     transcritas = [(i, limpia) for i, limpia in transcritas if limpia]
-    comparador = difflib.SequenceMatcher(None, [limpia for limpia, _ in guion],
+    comparador = difflib.SequenceMatcher(None, [g[0] for g in guion],
                                          [limpia for _, limpia in transcritas], autojunk=False)
+    return transcritas, comparador.get_opcodes()
+
+
+def corregir_con_guion(palabras, guion):
+    """Pone el texto del guion donde Whisper lo ha escrito mal. En los tramos iguales,
+    la forma escrita del guion (tildes y puntuación: "qué" -> "que"). En los distintos,
+    si tienen el mismo número de palabras y se parecen lo bastante, o son 1 o 2 palabras
+    entre dos tramos iguales ("eso que [hay] después": casi seguro, mal oído).
+    Devuelve los cambios de palabras, para enseñarlos."""
+    transcritas, tramos = alinear(palabras, guion)
+    cambios = []
+    for n, (operacion, a1, a2, b1, b2) in enumerate(tramos):
+        if operacion == "equal":
+            for (i, _), (_, _, original) in zip(transcritas[b1:b2], guion[a1:a2]):
+                palabras[i]["palabra"] = original
+            continue
+        if operacion != "replace" or a2 - a1 != b2 - b1:
+            continue
+        del_guion = "".join(g[0] for g in guion[a1:a2])
+        oido = "".join(limpia for _, limpia in transcritas[b1:b2])
+        entre_iguales = (0 < n < len(tramos) - 1 and tramos[n - 1][0] == "equal"
+                         and tramos[n + 1][0] == "equal")
+        parecido = difflib.SequenceMatcher(None, del_guion, oido).ratio()
+        if parecido < PARECIDO_MIN and not (entre_iguales and a2 - a1 <= 2):
+            continue
+        antes = " ".join(palabras[i]["palabra"] for i, _ in transcritas[b1:b2])
+        for (i, _), (_, _, original) in zip(transcritas[b1:b2], guion[a1:a2]):
+            palabras[i]["palabra"] = original
+        cambios.append(f"«{antes}» -> «{' '.join(g[2] for g in guion[a1:a2])}»")
+    return cambios
+
+
+def indices_resaltados(palabras, guion):
+    """Las posiciones de la transcripción que corresponden a palabras en negrita del
+    guion, y cuántas palabras en negrita tiene el guion."""
+    transcritas, tramos = alinear(palabras, guion)
     resaltados = set()
-    for tramo in comparador.get_matching_blocks():      # tramos iguales en los dos textos
-        for k in range(tramo.size):
-            if guion[tramo.a + k][1]:
-                resaltados.add(transcritas[tramo.b + k][0])
-    return resaltados, sum(negrita for _, negrita in guion)
+    for operacion, a1, a2, b1, b2 in tramos:
+        if operacion == "equal":                         # tramo igual en los dos textos
+            for k in range(a2 - a1):
+                if guion[a1 + k][1]:
+                    resaltados.add(transcritas[b1 + k][0])
+        elif operacion == "replace" and all(g[1] for g in guion[a1:a2]):
+            # Whisper lo ha escrito de otra manera ("treinta mil" -> "30.000"): si en el
+            # guion todo el tramo va en negrita, se resalta lo transcrito en su lugar
+            resaltados.update(i for i, _ in transcritas[b1:b2])
+    return resaltados, sum(g[1] for g in guion)
+
+
+def unir_cifras(palabras):
+    """Whisper parte a veces las cifras ("30" y ".000,"): se juntan en una sola palabra."""
+    resultado = []
+    for p in palabras:
+        if resultado and re.match(r"[.,]\d", p["palabra"]) and re.search(r"\d$", resultado[-1]["palabra"]):
+            resultado[-1] = {**resultado[-1], "palabra": resultado[-1]["palabra"] + p["palabra"], "fin": p["fin"]}
+        else:
+            resultado.append(dict(p))
+    return resultado
 
 
 def formato_ass(segundos):
@@ -110,10 +176,14 @@ def escribir(p, c):
 
 
 def generar_ass(json_entrada, ass_salida, c, guion=None):
-    """guion: la ruta de guion.md del short; si no existe, no se resalta nada."""
-    palabras = json.loads(json_entrada.read_text(encoding="utf-8"))
-    if c["resaltar_negritas"] and guion is not None and guion.exists():
-        resaltados, en_negrita = indices_resaltados(palabras, guion)
+    """guion: la ruta de guion.md del short; si no existe, no se corrige ni se resalta nada."""
+    palabras = unir_cifras(json.loads(json_entrada.read_text(encoding="utf-8")))
+    del_guion = palabras_del_guion(guion) if guion is not None and guion.exists() else []
+    if c["corregir_con_guion"] and del_guion:
+        cambios = corregir_con_guion(palabras, del_guion)
+        print(f"   {len(cambios)} tramos corregidos con el guion" + "".join(f"\n      {x}" for x in cambios))
+    if c["resaltar_negritas"] and del_guion:
+        resaltados, en_negrita = indices_resaltados(palabras, del_guion)
         for i in resaltados:
             palabras[i]["resaltada"] = True
         print(f"   {len(resaltados)} de {en_negrita} palabras en negrita del guion resaltadas")
@@ -124,6 +194,10 @@ def generar_ass(json_entrada, ass_salida, c, guion=None):
         inicio, fin = g[0]["inicio"], g[-1]["fin"]
         if n + 1 < len(grupos) and grupos[n + 1][0]["inicio"] - fin < 0.25:
             fin = grupos[n + 1][0]["inicio"]
+        # Cada subtítulo se ve al menos duracion_min, sin pisar el siguiente
+        fin = max(fin, inicio + c["duracion_min"])
+        if n + 1 < len(grupos):
+            fin = min(fin, grupos[n + 1][0]["inicio"])
         texto = " ".join(escribir(p, c) for p in g)
         lineas.append(
             f"Dialogue: 0,{formato_ass(inicio)},{formato_ass(fin)},Short,,0,0,0,,{texto}\n"
