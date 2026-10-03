@@ -283,6 +283,122 @@ Cambios en el índice (con permiso):
 
 ---
 
+## Parte 5: la skill `guion-short`
+
+### Qué es una skill
+Una skill es un conjunto de instrucciones que Claude Code carga cuando hacen falta.
+Según la documentación oficial (code.claude.com/docs/en/skills):
+
+- Las de proyecto van en `.claude/skills/<nombre>/SKILL.md` y se suben a Git.
+- `SKILL.md` tiene una cabecera YAML (`name`, `description`...) y las instrucciones
+  en Markdown. Claude decide usarla comparando lo que le pido con la `description`;
+  también se puede llamar con `/guion-short caballo`.
+- Conviene que `SKILL.md` no pase de 500 líneas: el material de consulta va en
+  archivos aparte de la misma carpeta, que se leen solo cuando hacen falta.
+- `` !`comando` `` inyecta datos al cargarla. Si el comando falla, la skill no se
+  carga, por eso todos llevan `|| true`.
+
+### Qué hace
+`.claude/skills/guion-short/SKILL.md`, con `ejemplo-001-pulpo.md` como referencia de tono:
+
+1. **Guion**: gancho (máximo 12 palabras), dato, giro y remate; 100-120 palabras;
+   **énfasis** en negrita y `(pausa)` entre paréntesis; una técnica de interacción
+   (pregunta de respuesta fácil, de opinión ligera, bucle, promesa del siguiente
+   dato o reto inicial) distinta de la del short anterior; cada dato confirmado en
+   dos fuentes fiables, sin mitos, con las fuentes al final. Me lo enseña y espera
+   mi visto bueno.
+2. **Ficha**: reserva el siguiente número y crea `shorts/NNN-tema/guion.md` y
+   `config.json` (solo lo que cambia: música y efectos). Música por estado de ánimo,
+   distinta de la anterior y más larga que el short. Efectos:
+   mín(3, redondeo(duración / 13,5)), ninguno en los primeros 8 s.
+3. **Material**: `evaluar_material` con la duración estimada; si falta, me pide
+   permiso para `buscar_clips`.
+4. **Cierre**: me dice con qué nombre guardar la grabación (`NNN-tema.wav`).
+
+Al cargarse ve la velocidad de lectura, la técnica y la música de cada short y el
+último número usado. `shorts/001-pulpo/guion.md` se ha creado a partir de la
+transcripción para que la rotación de técnicas tenga historial.
+
+### Receta reservada
+Antes, una receta que ya existía se usaba tal cual, y `preparar_short` siempre cogía
+el siguiente número. Con una receta creada antes de grabar habría dos problemas:
+`preparar_short` le daría otro número, y el vigilante no aplicaría la plantilla
+(se perdería, por ejemplo, `voz.inicio: "auto"`). Ahora:
+
+- Una receta es **reservada** si tiene `guion.md` y su `config.json` no tiene
+  `audio_original`.
+- `preparar_short` usa la reservada del tema (si hay varias, pide cuál con `short`).
+- El vigilante la pone **encima de la plantilla** al llegar la grabación.
+
+### Duración real y velocidad de lectura
+La duración la marca la grabación: los 45 s de `evaluar_material` antes de grabar
+son una estimación (palabras / velocidad + 1 s de cola).
+
+- `config/lectura.json` guarda la velocidad (empieza en 2,54 palabras/s: 108
+  palabras en 42,55 s del 001-pulpo) y las muestras de cada short.
+- Al terminar un short, el vigilante añade su muestra (palabras transcritas y
+  segundos de `voz.wav`, pausas incluidas) y la velocidad pasa a ser la **mediana de
+  las 5 últimas**: se adapta a cómo grabo ahora y una grabación rara no la desvía.
+- `crear()` acepta una función `despues_de_voz` que se llama con la duración real
+  (voz detectada + cola) antes de transcribir. El vigilante la usa para elegir los
+  clips con esa duración (antes se elegían con el audio sin recortar) o, si la
+  receta ya los tiene, comprobarlos. Si no alcanzan, lo anota en el registro antes
+  de renderizar.
+- `efectos.inicio_min` (antes un 3 fijo en `cortes.py`) permite que la skill pida
+  8 s sin efectos al principio. Con el valor por defecto (3) los efectos salen
+  idénticos (`md5`).
+
+Pruebas (en una copia temporal, sin renderizar): `preparar_short` usa la receta
+reservada `002-caballo` aunque el siguiente número libre era el 3; el vigilante
+recupera la plantilla y conserva la música y los efectos de la receta; `crear()`
+llama a la función justo después de la voz (43,55 s con 001-pulpo); la velocidad
+sustituye la muestra de un short repetido en vez de duplicarla.
+
+---
+
+## Parte 6: primer short con la skill (002-caballo) y arreglos de mezcla
+
+El 002-caballo es el primer short hecho de principio a fin con la skill: guion con
+reto inicial, receta reservada, 2 clips descargados (`caballo_05` y `caballo_06`) y
+grabación de 115 palabras en 41,6 s (2,76 palabras/s; la referencia pasa a 2,65).
+
+Al revisarlo salieron tres fallos. La regla desde ahora: **cada corrección se
+arregla en el código o en los valores por defecto, no solo en la receta**, y se
+apunta aquí, en `CLAUDE.md` y en la skill.
+
+| Lo que se notaba | Causa medida | Arreglo |
+|---|---|---|
+| La música acababa de golpe y el final quedaba mudo | El audio duraba 41,6 s y el vídeo 44,1 s: `sidechaincompress` (el *ducking*) termina con su entrada más corta, la voz, y se llevaba la música | `apad` alarga la voz con silencio hasta el final (`montaje.py`). Ahora audio y vídeo duran lo mismo y el fundido se oye entero |
+| El efecto de error no se oía | Los efectos vienen con niveles muy distintos: `error_01` tiene el pico en -21 dB y `whoosh_01` en -0,1 dB, y a todos se les aplicaba el mismo 0,35 | Cada efecto se iguala a `efectos.pico` (-3 dB) antes de aplicar `efectos.volumen` (0,5). `error_01` sube 18 dB |
+| Música algo alta | `musica.volumen` 0,35 | 0,25 por defecto |
+
+También cambian por defecto el fundido de salida (de 1,6 a 3 s) y la cola (de 1 a
+2,5 s), para que la música se apague con calma después de la última palabra.
+
+### Efectos anclados a palabras
+El efecto de error tenía que sonar al decir "vomitar". Con un segundo fijo
+(`momento`) se descuadraría al volver a grabar, así que en `efectos.lista` un efecto
+puede llevar `"palabra": "vomitar"` (y `"vez": 2` si la palabra se repite): empieza
+justo al terminar esa palabra en la transcripción. Lo hace `anclar_a_palabras()` en
+`crear_short.py`, y la skill ya lo propone para los efectos que dependen del texto.
+
+### El vigilante y el código nuevo
+El vigilante carga el código al arrancar. El primer render del 002 lo hizo uno
+arrancado el día anterior, sin los cambios de la parte 5. **Después de cambiar
+código hay que reiniciarlo.** Ahora corre en segundo plano:
+
+```bash
+docker run -d --rm --name vigilante -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
+  shorts-whisper python /proyecto/scripts/vigilar_bandeja.py --plantilla curiosidades
+docker logs -f vigilante                       # ver lo que hace
+docker kill --signal=SIGINT vigilante          # pararlo como con Ctrl+C
+```
+
+`docker stop` no sirve para pararlo limpio: envía SIGTERM, y Python como proceso
+principal del contenedor no reacciona hasta que Docker lo mata a los 10 s.
+
+---
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -293,6 +409,11 @@ Cambios en el índice (con permiso):
 | Un script de prueba no aparecía dentro del contenedor | Colima solo comparte la carpeta de usuario, no `/private/tmp` | Pasar el script por la entrada estándar (`docker run -i ... python - < script.py`) | |
 | Con 1,6 veces la duración del short se repetían planos | Cada corte gasta 0,5 s de margen y se pierde el final de cada clip | Simular el reparto real con cortes mínimos, medios y máximos | Comprobar los números de partida con una simulación |
 | El servidor no podía usar `asignar_clips` | Imprimía avisos con `print()`, que rompe la comunicación MCP | Separar `repartir()`, que devuelve los avisos | `md5` para comprobar que la refactorización no cambia el resultado |
+| Una receta creada antes de grabar perdía la plantilla y `preparar_short` le daba otro número | Una receta existente se usaba tal cual y el número siempre era el siguiente libre | Recetas *reservadas*: se ponen encima de la plantilla y `preparar_short` usa su número | Probar los cambios del vigilante en una copia temporal |
+| Los clips se elegían con una duración que no era la real | Se medía el audio sin recortar, antes del paso `voz` | `despues_de_voz` en `crear()`, con la duración real | |
+| El final del vídeo quedaba mudo | `sidechaincompress` acaba con la voz y cortaba la música | `apad` alarga la voz hasta el final | Comparar la duración de las pistas de audio y vídeo con `ffprobe` |
+| Un efecto no se oía | Los archivos de efectos tienen niveles de pico muy distintos | Igualar el pico de cada efecto antes de mezclar | Medir con `volumedetect` los archivos nuevos |
+| El vigilante no usaba el código nuevo | Python carga el código al arrancar | Reiniciar el vigilante tras cambiar código | |
 | [Añade aquí otros problemas] | | | |
 
 ## Herramientas aprendidas
@@ -316,6 +437,7 @@ Cambios en el índice (con permiso):
 ## Pendiente
 - Poner los créditos ("Vídeos: <autor> en Pixabay") en la descripción de cada short.
 - Añadir Pexels como segunda fuente cuando vuelva a dar claves.
+- Probar la skill `guion-short` con un short real y revisar la estimación de duración con la grabación.
 - Aviso: `musica/relajada_02.mp3` dura 47,9 s (medido con `ffprobe`), menos de
   los 50 s recomendados. Solo sirve para shorts de unos 45 s como mucho.
 - [Añade aquí otros pendientes]

@@ -12,6 +12,7 @@ from pasos.transcripcion import transcribir
 from pasos.subtitulos import generar_ass
 from pasos.cortes import crear_edl, elegir_efectos
 from pasos.montaje import generar_fondo, render
+from pasos.utilidades import duracion
 
 RAIZ = Path(__file__).resolve().parent.parent   # la carpeta del proyecto
 
@@ -37,6 +38,30 @@ def fusionar(base, cambios):
     return resultado
 
 
+def anclar_a_palabras(efectos, json_palabras):
+    """Los efectos con "palabra" (y "vez", si se repite: 1 la primera) empiezan justo al
+    terminar esa palabra. Así siguen en su sitio aunque se vuelva a grabar la voz;
+    los que llevan "momento" (segundo exacto, en el centro del efecto) no cambian."""
+    def limpia(texto):
+        return texto.lower().strip("¿?¡!.,;:…\"'«»()")
+
+    palabras = json.loads(json_palabras.read_text(encoding="utf-8"))
+    resultado = []
+    for efecto in efectos:
+        if "palabra" in efecto:
+            finales = [p["fin"] for p in palabras if limpia(p["palabra"]) == limpia(efecto["palabra"])]
+            vez = efecto.get("vez", 1)
+            if len(finales) < vez:
+                raise RuntimeError(f"La palabra '{efecto['palabra']}' (vez {vez}) del efecto "
+                                   f"{efecto['archivo']} no está en la transcripción")
+            # render centra cada efecto en su momento: medio efecto después del final de la palabra
+            momento = finales[vez - 1] + duracion(RAIZ / efecto["archivo"]) / 2
+            print(f"   efecto {Path(efecto['archivo']).name} tras «{efecto['palabra']}» ({finales[vez - 1]:.2f} s)")
+            efecto = {**efecto, "momento": momento}
+        resultado.append(efecto)
+    return resultado
+
+
 def cargar_config(nombre):
     base = json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8"))
     ruta_propia = RAIZ / "shorts" / nombre / "config.json"
@@ -44,8 +69,11 @@ def cargar_config(nombre):
     return fusionar(base, propia)
 
 
-def crear(nombre, rehacer=None):
-    """Crea (o actualiza) el short 'nombre' y devuelve la ruta del vídeo final."""
+def crear(nombre, rehacer=None, despues_de_voz=None):
+    """Crea (o actualiza) el short 'nombre' y devuelve la ruta del vídeo final.
+    despues_de_voz(config, segundos) es opcional: se llama cuando la voz ya está lista
+    (con la duración real del short: voz + cola) y antes del resto de pasos. El vigilante
+    la usa para elegir o comprobar los clips; puede cambiar config["video"]["clips"]."""
     config = cargar_config(nombre)
     receta = RAIZ / "shorts" / nombre
     trabajo = RAIZ / "data" / "shorts" / nombre
@@ -70,6 +98,8 @@ def crear(nombre, rehacer=None):
     inicio = time.perf_counter()
     rehechos = set()
     for paso in PASOS:
+        if paso == "transcripcion" and despues_de_voz:
+            despues_de_voz(config, duracion(archivos["voz"]) + config["final"]["cola"])
         necesario = (
             paso == rehacer
             or not archivos[paso].exists()
@@ -93,7 +123,7 @@ def crear(nombre, rehacer=None):
             generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"])
         elif paso == "render":
             # Efectos escritos a mano en la configuración, o elegidos automáticamente
-            efectos = config["efectos"]["lista"]
+            efectos = anclar_a_palabras(config["efectos"]["lista"], archivos["transcripcion"])
             if not efectos and config["efectos"]["automaticos"] > 0:
                 efectos = elegir_efectos(edl, archivos["transcripcion"], config)
             render(archivos["fondo"], archivos["voz"], archivos["subtitulos"],

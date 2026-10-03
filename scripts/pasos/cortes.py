@@ -173,7 +173,7 @@ def elegir_efectos(edl, json_palabras, config):
     # Puntuación de cada corte: la de la pausa en la que cae (0 si no cae en ninguna)
     candidatos = []
     for corte in cortes:
-        if corte < 3.0 or corte > total - 3.0:
+        if corte < e["inicio_min"] or corte > total - 3.0:   # ni al principio ni en los 3 s finales
             continue
         cercanas = [p for m, p in pausas if abs(m - corte) <= 0.1]
         if cercanas and max(cercanas) >= 1.0:   # solo finales de frase

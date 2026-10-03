@@ -4,6 +4,7 @@ El render normaliza el volumen en dos pasadas: primero mezcla el audio y lo mide
 y después aplica la corrección exacta al montarlo con el vídeo.
 """
 import json
+import re
 import shutil
 
 from .utilidades import ejecutar, duracion
@@ -57,9 +58,13 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c):
 def construir_grafo_audio(total, musica, efectos):
     """Grafo de la mezcla de audio, sin normalizar. Entradas: 0 voz, 1 música (si hay),
     y después los efectos. 'efectos' es una lista de (retraso_ms, volumen)."""
+    # La voz se alarga con silencio hasta el final: sidechaincompress termina cuando
+    # termina su entrada más corta, y sin esto la música se cortaba al acabar la voz
+    # (la cola y el fundido de salida se quedaban mudos).
+    voz = f"[0:a]{FORMATO},apad=whole_dur={total:.3f}"
     if musica:
         partes = [
-            f"[0:a]{FORMATO},asplit=2[voz][voz_sc]",
+            f"{voz},asplit=2[voz][voz_sc]",
             f"[1:a]{FORMATO},volume={musica['volumen']},"
             f"afade=t=in:d={musica['fundido_entrada']},"
             f"afade=t=out:st={total - musica['fundido_salida']:.3f}:d={musica['fundido_salida']}[musica]",
@@ -69,7 +74,7 @@ def construir_grafo_audio(total, musica, efectos):
         ]
         entradas, siguiente = ["[voz]", "[musica_duck]"], 2
     else:
-        partes = [f"[0:a]{FORMATO}[voz]"]
+        partes = [f"{voz}[voz]"]
         entradas, siguiente = ["[voz]"], 1
 
     for n, (retraso, volumen) in enumerate(efectos):
@@ -87,6 +92,14 @@ def construir_grafo_audio(total, musica, efectos):
 def leer_json_final(texto):
     """loudnorm escribe su informe JSON al final de la salida de FFmpeg: lo extrae."""
     return json.loads(texto[texto.rfind("{"): texto.rfind("}") + 1])
+
+
+def pico(archivo):
+    """El pico de un archivo de audio, en dB (volumedetect)."""
+    resultado = ejecutar([
+        "ffmpeg", "-hide_banner", "-nostats", "-i", archivo, "-af", "volumedetect", "-f", "null", "-",
+    ])
+    return float(re.search(r"max_volume: (-?[\d.]+) dB", resultado.stderr).group(1))
 
 
 def medir_volumen(archivo, objetivo):
@@ -110,11 +123,17 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
         entradas += ["-ss", musica["inicio"], "-t", f"{total:.3f}", "-i", raiz / musica["archivo"]]
 
     efectos = []
+    e = config["efectos"]
     for efecto in lista_efectos:
         archivo = raiz / efecto["archivo"]
         # Empieza la mitad de su duración antes del momento, para quedar centrado
         retraso = max(0, round((efecto["momento"] - duracion(archivo) / 2) * 1000))
-        efectos.append((retraso, config["efectos"]["volumen"]))
+        # Cada efecto viene con un nivel distinto (de -0,1 a -21 dB de pico): primero se
+        # lleva su pico a efectos.pico y después se aplica efectos.volumen, igual para todos
+        medido = pico(archivo)
+        volumen = e["volumen"] * 10 ** ((e["pico"] - medido) / 20)
+        print(f"   efecto {archivo.name}: pico {medido:.1f} dB, ajuste {e['pico'] - medido:+.1f} dB")
+        efectos.append((retraso, f"{volumen:.4f}"))
         entradas += ["-i", archivo]
 
     # 1) Mezcla de audio, todavía sin normalizar

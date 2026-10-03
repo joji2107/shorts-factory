@@ -89,6 +89,22 @@ def _contar(n, palabra):
     return f"{n} {palabra}" + ("" if n == 1 else "s")
 
 
+def _reservadas(tema):
+    """Recetas reservadas de un tema: shorts/NNN-tema/ con guion.md, sin grabación
+    todavía (su config.json no tiene audio_original) y sin audio esperando en la bandeja."""
+    reservadas = []
+    for receta in sorted((RAIZ / "shorts").glob(f"[0-9][0-9][0-9]-{tema}")):
+        ruta = receta / "config.json"
+        if not (receta / "guion.md").exists() or not ruta.exists():
+            continue
+        if "audio_original" in json.loads(ruta.read_text(encoding="utf-8")):
+            continue
+        if any(BANDEJA.glob(f"{receta.name}.*")):
+            continue
+        reservadas.append(receta.name)
+    return reservadas
+
+
 def _siguiente_numero():
     """El siguiente número libre para un short (los 9xx están reservados para pruebas)."""
     lugares = [RAIZ / "shorts", DATA / "archivo", BANDEJA, DATA / "revision", DATA / "listos"]
@@ -327,9 +343,12 @@ def listar_shorts() -> list[dict]:
 
 
 @servidor.tool()
-def preparar_short(grabacion: str, tema: str) -> str:
+def preparar_short(grabacion: str, tema: str, short: str = "") -> str:
     """Pone una grabación de data/entrada/ en la bandeja como el siguiente short del tema
     (por ejemplo, 'voz_prueba.wav' con el tema 'pulpo' crea '002-pulpo.wav').
+    Si hay una receta reservada de ese tema (creada por la skill guion-short, con su
+    guion, música y efectos), usa su nombre. Si hubiera varias, indica cuál en 'short'
+    (por ejemplo '003-caballo').
     Si el vigilante está en marcha, el vídeo estará en data/revision/ en unos 5 minutos."""
     archivo = ENTRADA / Path(grabacion).name          # solo el nombre: nunca rutas fuera de entrada/
     if not archivo.is_file():
@@ -344,10 +363,21 @@ def preparar_short(grabacion: str, tema: str) -> str:
     if tema not in temas:
         return f"No hay vídeos con la etiqueta '{tema}'. Temas disponibles: {sorted(temas)}"
 
-    nombre = f"{_siguiente_numero():03d}-{tema}"
+    reservadas = _reservadas(tema)
+    if short:
+        if Path(short).name not in reservadas:
+            return f"'{short}' no es una receta reservada de '{tema}'. Reservadas: {reservadas or 'ninguna'}"
+        nombre = Path(short).name
+    elif len(reservadas) > 1:
+        return f"Hay varias recetas reservadas de '{tema}': {reservadas}. Indica cuál en 'short'."
+    elif reservadas:
+        nombre = reservadas[0]
+    else:
+        nombre = f"{_siguiente_numero():03d}-{tema}"
     BANDEJA.mkdir(parents=True, exist_ok=True)
     shutil.copy2(archivo, BANDEJA / f"{nombre}{archivo.suffix.lower()}")
-    return (f"Grabación copiada a la bandeja como {nombre}{archivo.suffix.lower()} "
+    origen = " (receta reservada, con su guion, música y efectos)" if nombre in reservadas else ""
+    return (f"Grabación copiada a la bandeja como {nombre}{archivo.suffix.lower()}{origen} "
             f"({temas[tema]} clips disponibles de '{tema}'). Cuando el vigilante termine, "
             f"el vídeo estará en data/revision/{nombre}.mp4.")
 

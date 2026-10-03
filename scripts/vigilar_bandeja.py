@@ -19,6 +19,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
+import lectura
 import material
 from crear_short import RAIZ, crear, fusionar
 from pasos.utilidades import duracion
@@ -49,39 +50,75 @@ def esta_completo(archivo, espera=3):
 
 
 def preparar_receta(nombre, audio, plantilla):
-    """Crea (o actualiza) shorts/<nombre>/config.json a partir de la plantilla."""
+    """Crea (o actualiza) shorts/<nombre>/config.json a partir de la plantilla.
+    Una receta *reservada* (la crea la skill guion-short antes de grabar: tiene guion
+    pero aún no audio_original) solo guarda lo que cambia, así que se pone encima de
+    la plantilla. Una receta de un short ya grabado se usa tal cual."""
     receta = RAIZ / "shorts" / nombre
     ruta = receta / "config.json"
+    ruta_plantilla = RAIZ / "config" / "plantillas" / f"{plantilla}.json"
+    config_plantilla = json.loads(ruta_plantilla.read_text(encoding="utf-8"))
     if ruta.exists():
         config = json.loads(ruta.read_text(encoding="utf-8"))
+        if "audio_original" not in config:
+            config = fusionar(config_plantilla, config)
+            registrar(f"       Receta reservada: se aplica encima de la plantilla '{plantilla}'")
     else:
-        ruta_plantilla = RAIZ / "config" / "plantillas" / f"{plantilla}.json"
-        config = json.loads(ruta_plantilla.read_text(encoding="utf-8"))
+        config = config_plantilla
 
     config["audio_original"] = str(audio.relative_to(RAIZ))
 
-    # Si la receta no dice qué clips usar, se eligen por el tema del nombre: solo los
-    # que necesita el short, empezando por los menos usados (al azar entre empatados).
-    # Quedan escritos en la receta, así que al rehacer el short se usan los mismos.
+    # Los clips se eligen después de la voz, con la duración real (despues_de_voz).
+    # Aquí solo se comprueba que el tema tenga alguno, para fallar antes de procesar.
+    tema = nombre.split("-", 1)[-1]              # "002-caballo" -> "caballo"
     tiene_clips = config.get("video", {}).get("clips")
-    if not tiene_clips and not (receta / "cortes.txt").exists():
-        tema = nombre.split("-", 1)[-1]          # "002-caballo" -> "caballo"
-        completa = fusionar(json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8")), config)
-        # El audio aún tiene el silencio del principio: el short saldrá algo más corto (margen a favor)
-        total = duracion(audio) + completa["final"]["cola"]
-        clips, estado = material.elegir_clips(tema, total, completa)
-        if not clips:
-            raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv")
-        config.setdefault("video", {})["clips"] = clips
-        disponibles = len(material.clips_del_tema(tema))
-        registrar(f"       {len(clips)} de {disponibles} clips de '{tema}' para {total:.0f} s "
-                  f"(material {estado}): {', '.join(clips)}")
-        if estado != "suficiente":
-            registrar(f"       AVISO: material {estado} para '{tema}' (menos de {material.MIN_CLIPS} "
-                      f"clips o se repetirían planos). Usa evaluar_material para ver cuántos faltan")
+    if not tiene_clips and not (receta / "cortes.txt").exists() and not material.clips_del_tema(tema):
+        raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv")
 
     receta.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def material_despues_de_voz(nombre):
+    """Devuelve la función que crear() llama cuando la voz está lista, con la duración
+    real del short (voz detectada + cola). Si la receta no tiene clips, los elige: solo
+    los necesarios, empezando por los menos usados (al azar entre empatados), y los
+    escribe en la receta (al rehacer se usan los mismos). Si ya tiene clips, comprueba
+    que alcancen. Si no hay material suficiente, lo anota antes de renderizar."""
+    receta = RAIZ / "shorts" / nombre
+
+    def comprobar(config, total):
+        if (receta / "cortes.txt").exists():
+            return                               # cortes a mano: no hay nada que elegir
+        tema = nombre.split("-", 1)[-1]
+        clips = config["video"]["clips"]
+        if not clips:
+            clips, estado = material.elegir_clips(tema, total, config)
+            config["video"]["clips"] = clips
+            ruta = receta / "config.json"
+            propia = json.loads(ruta.read_text(encoding="utf-8"))
+            propia.setdefault("video", {})["clips"] = clips
+            ruta.write_text(json.dumps(propia, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            registrar(f"       {len(clips)} de {len(material.clips_del_tema(tema))} clips de '{tema}' "
+                      f"para {total:.1f} s (material {estado}): {', '.join(clips)}")
+        else:
+            estado = material.estado(material.duraciones(clips), total, config["video"])
+            registrar(f"       Los {len(clips)} clips de la receta para {total:.1f} s: material {estado}")
+        if estado != "suficiente":
+            registrar(f"       AVISO: material {estado} para {total:.1f} s (menos de {material.MIN_CLIPS} "
+                      f"clips o se repetirían planos). Usa evaluar_material para ver cuántos faltan")
+
+    return comprobar
+
+
+def anotar_lectura(nombre):
+    """Añade la velocidad de lectura de esta grabación a config/lectura.json."""
+    trabajo = DATA / "shorts" / nombre
+    palabras = len(json.loads((trabajo / "palabras.json").read_text(encoding="utf-8")))
+    segundos = duracion(trabajo / "voz.wav")
+    esta, media = lectura.anadir_muestra(nombre, palabras, segundos)
+    registrar(f"       Lectura: {palabras} palabras en {segundos:.1f} s ({esta:.2f} por segundo); "
+              f"velocidad de referencia: {media:.2f}")
 
 
 # Archivos de trabajo pesados que se borran al terminar un short. Se conservan
@@ -114,13 +151,18 @@ def procesar(audio, plantilla):
     inicio = time.perf_counter()
     try:
         preparar_receta(nombre, archivado, plantilla)
-        final = crear(nombre, rehacer="voz")   # audio nuevo: se rehace todo desde la voz
+        # Audio nuevo: se rehace todo desde la voz
+        final = crear(nombre, rehacer="voz", despues_de_voz=material_despues_de_voz(nombre))
         destino = REVISION / f"{nombre}.mp4"
         shutil.move(final, destino)            # se mueve: el vídeo no queda duplicado
         megas = limpiar(nombre)
         minutos = (time.perf_counter() - inicio) / 60
         registrar(f"OK     {nombre} en {minutos:.1f} min -> {destino.relative_to(RAIZ)} "
                   f"({megas:.0f} MB de archivos temporales borrados)")
+        try:                                   # si falla, el short ya está hecho: solo se avisa
+            anotar_lectura(nombre)
+        except Exception as error:
+            registrar(f"       AVISO: no se ha podido anotar la velocidad de lectura: {error}")
     except Exception as error:
         shutil.move(archivado, ERRORES / audio.name)
         (ERRORES / f"{nombre}.log").write_text(traceback.format_exc(), encoding="utf-8")
