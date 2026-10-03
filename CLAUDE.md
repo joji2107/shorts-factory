@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Qué es
 
-Pipeline que convierte una grabación de voz en un short vertical (1080x1920, 30 fps) con clips de fondo, música con *ducking*, efectos y subtítulos dinámicos. Es un proyecto de aprendizaje (estudiante de ASIX) organizado por fases: cada fase se trabaja en una rama `fase-N`, se documenta en `docs/NN-*.md` y se une a `main` al terminar. La fase actual (8) es servidor MCP + Claude Code y búsqueda de clips con la API de Pixabay (Pexels ha pausado la emisión de claves).
+Pipeline que convierte una grabación de voz en un short vertical (1080x1920, 30 fps) con clips de fondo, música con *ducking*, efectos y subtítulos dinámicos. Es un proyecto de aprendizaje (estudiante de ASIX) organizado por fases: cada fase se trabaja en una rama `fase-N`, se documenta en `docs/NN-*.md` y se une a `main` al terminar. La fase 8 añadió el servidor MCP + Claude Code y la búsqueda de clips con la API de Pixabay (Pexels ha pausado la emisión de claves). La fase actual (9) es estrategia de contenido y canales: textos de publicación para YouTube, Instagram, TikTok y X.
 
 Todo el proyecto está en español: código, nombres de variables, comentarios, mensajes de commit y documentación. Mantener ese idioma y el estilo sencillo (solo biblioteca estándar de Python + `faster-whisper`; FFmpeg vía `subprocess`).
 
@@ -86,6 +86,10 @@ El servidor se comunica con Claude por stdio, así que **nunca se usa `print()`*
 ## Skill `guion-short`
 
 `.claude/skills/guion-short/` (se invoca con `/guion-short <tema>` o al pedir un short): escribe el guion (gancho, dato, giro, remate; 100-120 palabras; datos verificados con fuentes; una técnica de interacción rotando) y prepara la receta reservada `shorts/NNN-tema/` con `guion.md` y `config.json` (música, efectos), comprobando el material con `evaluar_material`. Ejemplo de tono: `ejemplo-001-pulpo.md`.
+
+Después prepara `publicacion.md` (paso 5; con `/guion-short NNN-tema` va directo a él en un short que ya existe): 3 títulos de unos 60 caracteres con la favorita marcada (tema al principio, curiosidad que el vídeo resuelve; con *reto inicial* no dan la respuesta), descripción (gancho, 2-3 frases, pregunta ligada a la técnica, fuentes, créditos y 3-5 hashtags en español), comentario fijado de 150 caracteres como máximo y una versión aparte solo para la plataforma que lo necesite (X, con fuentes y créditos en una respuesta). Los bloques ```text van bajo secciones `##` con las plataformas que los usan (`## YouTube, Instagram y TikTok`) y apartados `###` (`Título`, `Descripción`, `Comentario fijado`, `Post`, `Respuesta`).
+
+`scripts/creditos.py NNN-tema` (en Docker, después del render): toma los clips de la lista de cortes (`cortes.txt` o `cortes_auto.txt`; si no hay, los de la receta), la música y los efectos que suenan, busca sus autores en el índice y sustituye la línea `Créditos:` (versión larga, hasta la primera línea vacía) y la línea `Créditos: ...` (versión corta, para X). Luego mide cada bloque con `LIMITES` (comprobados el 2026-10-03; si cambian, actualizar también la tabla de la skill) y termina con código 1 si alguno se pasa. Repetirlo no cambia nada.
 
 ## Documentación
 

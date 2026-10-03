@@ -571,7 +571,7 @@ principal del contenedor no reacciona hasta que Docker lo mata a los 10 s.
 ## Pendiente
 - No sobrescribir el vídeo de `data/revision/` al rehacer un short (guardar el nuevo con fecha y hora).
 - Que un `riser` termine en la pausa en vez de estar centrado en ella (sube hasta el final).
-- Poner los créditos ("Vídeos: <autor> en Pixabay") en la descripción de cada short.
+- Poner los créditos ("Vídeos: <autor> en Pixabay") en la descripción de cada short: hecho en la fase 9 (`scripts/creditos.py`, ver `docs/09-contenido-y-canales.md`).
 - Añadir Pexels como segunda fuente cuando vuelva a dar claves.
 - Aviso: `musica/relajada_02.mp3` dura 47,9 s (medido con `ffprobe`), menos de
   los 50 s recomendados. Solo sirve para shorts de unos 45 s como mucho.

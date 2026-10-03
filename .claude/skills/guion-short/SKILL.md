@@ -1,12 +1,15 @@
 ---
 name: guion-short
-description: Escribe el guion de un short sobre un tema (gancho, dato, giro y remate, con datos verificados y sus fuentes) y prepara su ficha en shorts/NNN-tema/ con guion.md y config.json (música, efectos), comprobando el material de vídeo. Úsala cuando el usuario pida un short, un guion o un vídeo nuevo sobre un tema.
-argument-hint: "[tema]"
+description: Escribe el guion de un short sobre un tema (gancho, dato, giro y remate, con datos verificados y sus fuentes), prepara su ficha en shorts/NNN-tema/ con guion.md y config.json (música, efectos), comprobando el material de vídeo, y sus textos de publicación (publicacion.md: títulos, descripción con fuentes y créditos, hashtags y comentario fijado para YouTube, Instagram, TikTok y X). Úsala cuando el usuario pida un short, un guion o un vídeo nuevo sobre un tema, o los textos para publicar un short.
+argument-hint: "[tema | NNN-tema]"
 ---
 
 # Guion y ficha de un short
 
 Tema pedido: $ARGUMENTS
+
+Si el argumento es un short que ya existe (`NNN-tema`, con su carpeta en `shorts/`),
+no hay guion que escribir: ve directamente al paso 5 (Publicación) con su `guion.md`.
 
 Todo en español. Explica al usuario qué vas a hacer en cada paso antes de hacerlo
 (está aprendiendo) y respeta las reglas de CLAUDE.md: no se toca `data/` salvo con
@@ -179,3 +182,112 @@ Dile al usuario:
   elegirá los clips con esa duración, anotará en `data/registro.log` si el material
   no alcanza, y al terminar sumará la grabación a la velocidad de lectura.
 - Un resumen: guion.md, música, efectos y estado del material.
+- Que `publicacion.md` ya tiene los textos, pero los créditos se completan después
+  del render (paso 5).
+
+## 5. Publicación
+
+Prepara `shorts/NNN-tema/publicacion.md` con los textos para publicar el short. Se
+hace justo después de la ficha (o directamente, si el short ya existe). Todo sale del
+guion: no añadas datos que no estén en él o en sus fuentes.
+
+**Títulos**: 3 opciones de unos 60 caracteres como máximo (YouTube corta hacia ahí en
+el móvil; el límite es 100). El tema o la palabra clave al principio y una brecha de
+curiosidad que el vídeo **resuelva de verdad**: nada que prometa algo que el vídeo no
+da, ni exageraciones que el guion no diga. Si la técnica es *reto inicial*, el título
+plantea el reto sin dar la respuesta. Marca tu favorita y di por qué.
+
+**Descripción** (en este orden):
+1. Primera línea: el gancho en una frase de 80 caracteres como mucho, porque es lo
+   único que se ve antes de "más" en TikTok (en Instagram, unos 125).
+2. 2 o 3 frases que amplíen el dato, sacadas de las fuentes del guion.
+3. Una pregunta que conecte con la técnica de interacción del guion (con *promesa del
+   siguiente dato*, que pregunte qué animal quieren después; con *reto inicial*, si lo
+   habían adivinado...).
+4. `Fuentes:` con el medio y la url de cada fuente del guion.
+5. Los créditos: una línea `Créditos:` sola, seguida de `(pendientes: se rellenan con
+   creditos.py)`. Los escribe el script con los datos del índice; no los copies a mano.
+6. Entre 3 y 5 hashtags en español, sin tildes ni `#shorts`: el del tema primero, uno
+   o dos generales (`#animales`, `#curiosidades`) y alguno del dato (`#pulpo`,
+   `#sangreazul`). YouTube enseña los tres primeros encima del título e Instagram solo
+   tiene en cuenta 5.
+
+**Comentario fijado**: una pregunta que invite a contestar, fácil de responder y
+distinta de la de la descripción. 150 caracteres como máximo (el límite de TikTok),
+para que sirva en todas.
+
+**Plataformas**: escribe una sola versión mientras quepa en todas y sepárala solo
+cuando una plataforma lo necesite:
+
+| Plataforma | Límites (comprobados el 2026-10-03) |
+|---|---|
+| YouTube | título 100 · descripción 5000 · comentario 10 000 |
+| Instagram | descripción 2200 (se ven unos 125) · como máximo 5 hashtags |
+| TikTok | descripción 4000 (se ven unos 80) · comentario 150 |
+| X | 280 por post (cada url cuenta 23): no caben fuentes ni créditos, que van en una respuesta al propio post |
+
+Plantilla (los nombres de las secciones `##` y `###` son los que mide el script):
+
+````markdown
+# NNN-tema: publicación
+
+**Técnica de interacción:** <la del guion> · **Título favorito:** <número>, porque <motivo>
+
+## Títulos
+```text
+<opción 1>
+<opción 2>
+<opción 3>
+```
+
+## YouTube
+### Título
+```text
+<la favorita>
+```
+
+## YouTube, Instagram y TikTok
+### Descripción
+```text
+<gancho, 80 caracteres como mucho>
+
+<2 o 3 frases>
+
+<pregunta>
+
+Fuentes:
+- <medio>: <url>
+
+Créditos:
+(pendientes: se rellenan con creditos.py)
+
+#tema #general #dato
+```
+### Comentario fijado
+```text
+<pregunta>
+```
+
+## X
+### Post
+```text
+<gancho, una frase del dato, la pregunta y 1 o 2 hashtags>
+```
+### Respuesta
+```text
+Fuentes: <url> <url>
+Créditos: (pendientes)
+```
+````
+
+**Medir y completar**: los caracteres no se cuentan a ojo. Después de escribir el
+archivo, y otra vez cuando el short tenga clips (tras el render), ejecuta:
+
+```bash
+docker run --rm -t -v "$PWD:/proyecto" shorts-whisper python /proyecto/scripts/creditos.py NNN-tema
+```
+
+Rellena los créditos con los clips que el short usa de verdad (de su lista de cortes),
+la música y los efectos, y mide cada texto con el límite de cada plataforma. Si algo
+"SE PASA", acórtalo y vuelve a ejecutarlo. Enseña al usuario los títulos con tu
+favorita y las medidas.
