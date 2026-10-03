@@ -290,6 +290,38 @@ del short anterior. Se deja así, pero ahora la skill no repite ninguna canción
 últimos 5 shorts y elige la que lleva más tiempo sin usarse (si ninguna libre encaja,
 propone buscar música nueva).
 
+## Parte 6: 005-caribe
+
+### Del larimar al pez loro
+La primera idea era el larimar, pero en Pixabay no hay ni un vídeo de esa piedra
+(`ver_candidatos` con "larimar" y "Barahona": 0), y con "blue gemstone" solo salen
+diamantes en 3D y zafiros: habría sido enseñar otra piedra como si fuera larimar. El
+tema pasó a las playas del Caribe: su arena blanca es, en parte, coral triturado por el
+pez loro. Se descartó la arena rosa de Barbuda porque solo aparecía en blogs de
+cruceros (las fuentes serias hablan de Bermudas, que no está en el Caribe).
+
+### Clips
+Primero en vertical; los horizontales solo si no hay verticales reales. De 8 clips, 4
+son verticales: en vertical, casi todo lo tropical era IA. Se descartaron dos playas
+de Martinica de arena **negra** (el guion habla de arena blanca), una piscina y una
+playa que parecía de Indonesia. Del pez loro solo hay un vídeo real en Pixabay
+(`caribe_05`, mordiendo coral). Con un `cortes.txt` manual, el pez loro y el arrecife
+(`caribe_05` y `caribe_08`) ocupan el 77 % del vídeo, repitiendo planos, y el pez
+loro sale justo al decir «pez loro».
+
+### Chasquidos al principio y al final
+La grabación tenía dos chasquidos antes de la primera palabra (0,18 y 0,31-0,43 s) y
+un clic de 30 ms medio segundo después de la última. `detectar_voz` solo busca
+silencios de 0,5 s, y entre el ruido y la voz no los hay. Ahora `quitar_ruidos()` en
+`voz.py` mide, sobre la voz ya procesada, los tramos con sonido (silencios de 0,1 s a
+-35 dB) y recorta los sonidos sueltos de menos de 0,15 s separados de la voz al menos
+0,2 s o pegados a otro igual (`voz.quitar_ruidos` en `por_defecto.json`). Probado con
+copias de las voces de 001 a 005: en 005 quita los dos ruidos; en 002 un ruido 0,8 s
+después de «soñando»; en 003, 0,02 s; en 001 y 004, nada. Como la voz empieza 0,51 s
+antes, el primer corte del `cortes.txt` se acortó lo mismo para que cada plano siga en
+su frase. La versión con ruidos queda en `data/revision/005-caribe.mp4` y la nueva en
+`data/revision/005-caribe_sin_ruidos.mp4`.
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -313,6 +345,8 @@ propone buscar música nueva).
 | El 004 falló al llegar a la bandeja | La grabación llegó antes de descargar los clips | Devolver el audio de `data/errores/` a la bandeja tras descargarlos | Descargar los clips antes de grabar |
 | No se podía leer el PDF del estudio | El Mac no tiene poppler y la web de Nature pide sesión | `pdftotext` en un contenedor de usar y tirar | |
 | 004-elefante repitió la música de 001-pulpo | La skill solo evitaba la canción del short anterior | Ninguna canción de los últimos 5 shorts; la que lleva más tiempo sin usarse | Lista de músicas por orden de número en la skill |
+| `creditos.py` no habría encontrado al autor de `playa_01` | El índice decía `playa_01.mp4` y el archivo es `.mp3` | Corregir la extensión en `biblioteca/indice.csv` | |
+| Chasquidos al principio y al final del 005 | El recorte automático solo quita silencios de 0,5 s o más | `quitar_ruidos()` en `voz.py`: fuera los sonidos sueltos de menos de 0,15 s en los bordes | Valores en `voz.quitar_ruidos` de `por_defecto.json` |
 | [Añade aquí otros problemas] | | | |
 
 ## Herramientas aprendidas
