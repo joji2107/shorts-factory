@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Qué es
 
-Pipeline que convierte una grabación de voz en un short vertical (1080x1920, 30 fps) con clips de fondo, música con *ducking*, efectos y subtítulos dinámicos. Es un proyecto de aprendizaje (estudiante de ASIX) organizado por fases: cada fase se trabaja en una rama `fase-N`, se documenta en `docs/NN-*.md` y se une a `main` al terminar. La fase actual (8) es servidor MCP + Claude Code y búsqueda de clips con la API de Pexels.
+Pipeline que convierte una grabación de voz en un short vertical (1080x1920, 30 fps) con clips de fondo, música con *ducking*, efectos y subtítulos dinámicos. Es un proyecto de aprendizaje (estudiante de ASIX) organizado por fases: cada fase se trabaja en una rama `fase-N`, se documenta en `docs/NN-*.md` y se une a `main` al terminar. La fase actual (8) es servidor MCP + Claude Code y búsqueda de clips con la API de Pixabay (Pexels ha pausado la emisión de claves).
 
 Todo el proyecto está en español: código, nombres de variables, comentarios, mensajes de commit y documentación. Mantener ese idioma y el estilo sencillo (solo biblioteca estándar de Python + `faster-whisper`; FFmpeg vía `subprocess`).
 
@@ -66,6 +66,11 @@ Las rutas de las configuraciones (`audio_original`, `musica.archivo`, `efectos.a
 - `listar_shorts`: las recetas de `shorts/` y el estado de su vídeo.
 - `preparar_short(grabacion, tema)`: copia una grabación de `data/entrada/` a la bandeja como `NNN-tema` con el siguiente número libre (los 9xx se reservan para pruebas).
 - `ver_error(nombre)`: el `.log` de `data/errores/`.
+- `buscar_clips(tema, busqueda_en_ingles, cantidad=4, otras_etiquetas="")`: busca en la API de vídeos de Pixabay clips de 6 s o más (primero los verticales; los horizontales sirven por el fondo desenfocado), descarga de cada uno la versión más pequeña cuyo lado corto sea de 1080 px o más (si no hay, la mayor) como `data/biblioteca/video/<tema>_NN.mp4` y añade su línea a `biblioteca/indice.csv`. Salta los vídeos cuya url ya está en el índice. Máximo 5 por llamada.
+
+Cada fuente de clips es una función (`_buscar_pixabay`) registrada en `FUENTES`, que devuelve los vídeos en un formato común; elegir versión, descargar, numerar y registrar es común. Pexels se podrá añadir así cuando vuelva a dar claves.
+
+Condiciones de Pixabay: las búsquedas se guardan en caché 24 horas en `data/cache/`, no se permiten descargas masivas y hay que indicar que los vídeos son de Pixabay. La clave está en `.env` (`PIXABAY_API_KEY`, nunca va a Git) y llega al contenedor con `docker run --env-file`, en el registro del servidor en Claude Code. En Pixabay la clave viaja dentro de la URL: **nunca se muestra ni se registra una URL completa de la API**, y los errores se describen solo por su código.
 
 No crea shorts directamente: `preparar_short` solo deja el audio en la bandeja, y el vigilante (que tiene que estar en marcha) hace el resto, igual que si el usuario hubiera dejado el archivo a mano. Pasar de `revision/` a `listos/` lo decide siempre el usuario.
 
@@ -83,6 +88,8 @@ Cada fase tiene su bitácora en `docs/` (objetivo, comandos, problemas y solucio
   `shorts-whisper` y montando el proyecto en `/proyecto`:
   `docker run --rm -t -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos shorts-whisper ...`
 - Nunca borres ni modifiques `data/archivo/`, `data/biblioteca/` ni `data/modelos/`.
+  En `data/biblioteca/` solo se pueden **añadir** archivos nuevos, y únicamente mediante la
+  herramienta `buscar_clips`; los existentes nunca se modifican ni se borran.
 - Nunca subas a Git nada de `data/` ni el archivo `.env`.
 - Después de editar código, comprueba la sintaxis:
   `python -m compileall -q /proyecto/scripts`.
