@@ -16,20 +16,22 @@ FFmpeg, Python, Git, agentes de IA y documentación técnica.
 - [x] Fase 5: Subtítulos con Whisper (transcripción y subtítulos dinámicos)
 - [x] Fase 6: Montaje del short (clips, voz, música, efectos y subtítulos)
 - [x] Fase 7: Automatización con Python (pipeline completo y carpeta bandeja)
-- [ ] Fase 8: Servidor MCP y Claude Code
+- [x] Fase 8: Servidor MCP y Claude Code (agente, clips de Pixabay y guiones)
 - [ ] Fase 9: Estrategia de contenido y canales
 - [ ] Producción: publicar al menos 3 shorts por semana
 
-Shorts terminados: 1 (`shorts/001-pulpo`).
+Shorts hechos: 2 (`shorts/001-pulpo` y `shorts/002-caballo`, este en revisión).
 
 ## Uso diario
 
 1. Arrancar Colima: `colima start`
-2. Arrancar el vigilante:
+2. Arrancar el vigilante en segundo plano:
 
 ```bash
-docker run --rm -t -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
-  shorts-whisper python /proyecto/scripts/vigilar_bandeja.py
+docker run -d --rm --name vigilante -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
+  shorts-whisper python /proyecto/scripts/vigilar_bandeja.py --plantilla curiosidades
+docker logs -f vigilante                  # ver lo que hace (Ctrl+C solo deja de mirar)
+docker kill --signal=SIGINT vigilante     # pararlo (también tras cambiar código, y volver a arrancarlo)
 ```
 
 3. Grabar la voz y soltarla en `data/bandeja/` con el nombre `NNN-tema.wav`
@@ -46,23 +48,71 @@ docker run --rm -t -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
 
 Pasos: `voz`, `transcripcion`, `subtitulos`, `fondo`, `render`.
 
+## Flujo de trabajo
+
+De encender el Mac a tener el short en revisión. Claude Code trabaja en modo
+manual: pide permiso antes de cada comando y explica qué va a hacer.
+
+1. **Abrir la terminal** en el proyecto: `cd ~/shorts-factory`.
+2. **Arrancar Colima**: `colima start`. Comprobar con `docker ps` que responde.
+3. **Arrancar el vigilante** en segundo plano (comando de "Uso diario", paso 2).
+   Al apagar el Mac se para, así que hay que arrancarlo cada vez.
+4. **Abrir Claude Code**: `claude`. Comprobar en la barra de estado que pone
+   `⏸ manual mode on` (si no, `Shift+Tab` hasta verlo) y con `/mcp` que el
+   servidor `fabrica` está conectado.
+5. **Pedir el guion**: `/guion-short caballo`, o en lenguaje normal: "pásame un
+   guion para un short sobre caballos, divertido y con algo de intriga".
+   Claude busca y verifica los datos y me enseña el guion, las palabras, la
+   duración estimada, la técnica de interacción y las fuentes.
+6. **Revisar el guion**: abrir las fuentes y pedir cambios si hace falta ("más
+   corto", "cambia el gancho", "otro dato"). Cuando esté bien: "está perfecto".
+7. **Ficha y material**: Claude reserva `shorts/NNN-tema/`, elige música y
+   efectos y comprueba con `evaluar_material` si hay clips suficientes. Si
+   faltan, me pide permiso para descargarlos con `buscar_clips`.
+8. **Grabar**: pedir "crea un documento con lo que tengo que leer y ábrelo"
+   (hoja `para_leer.html`, letra grande, énfasis y pausas marcadas). Grabar en
+   GarageBand y exportar como `NNN-tema.wav`, con el nombre exacto que dice Claude.
+9. **Dejar la grabación** en `data/bandeja/`. También se puede dejar en
+   `data/entrada/` con cualquier nombre y pedir "prepara el short con esta
+   grabación" (`preparar_short` usa la receta reservada).
+10. **Seguir el proceso**: `docker logs -f vigilante`, o pedir a Claude
+    "muéstrame el proceso en tiempo real". Tarda unos 2-3 minutos.
+11. **Revisar el vídeo** en `data/revision/NNN-tema.mp4`.
+12. **Pedir correcciones** describiendo lo que se ve u oye: "el efecto de error
+    no se oye", "baja un poco la música", "quiero que suene el error cuando digo
+    vomitar", "el final queda en silencio". Claude mide la causa antes de tocar,
+    la arregla en la receta y, si es un fallo general, en el código o en
+    `config/por_defecto.json`, rehace el short (`crear_short.py --rehacer ...`),
+    deja el vídeo nuevo en `data/revision/` y lo apunta en la documentación.
+    Si cambia código, reinicia el vigilante.
+13. **Aprobar**: mover el vídeo a mano de `data/revision/` a `data/listos/`.
+14. **Guardar el trabajo**: pedir a Claude el commit y el push (siempre pregunta antes).
+15. **Al terminar**: `docker kill --signal=SIGINT vigilante` y `colima stop`.
+
 ## Estructura del proyecto
 
 ```
 shorts-factory/
 ├── Dockerfile            # Imagen shorts-ffmpeg (Ubuntu + FFmpeg + fuentes)
 ├── Dockerfile.whisper    # Imagen shorts-whisper (anterior + Python + faster-whisper)
+├── CLAUDE.md             # Contexto y reglas del proyecto para Claude Code
+├── .claude/skills/       # Skill guion-short (guiones y ficha de cada short)
 ├── config/
 │   ├── por_defecto.json  # Valores comunes a todos los shorts
+│   ├── lectura.json      # Velocidad de lectura (se afina sola con cada short)
 │   └── plantillas/       # Plantillas para los shorts nuevos
 ├── scripts/
 │   ├── crear_short.py    # Crea un short paso a paso
 │   ├── vigilar_bandeja.py
+│   ├── servidor_mcp.py   # Herramientas de la fábrica para Claude Code
+│   ├── material.py       # Clips de un tema: duración, usos y si alcanzan
+│   ├── lectura.py        # Velocidad de lectura y estimación de duración
 │   └── pasos/            # Un módulo por paso
-├── shorts/               # Receta de cada short (configuración y cortes)
+├── shorts/               # Receta de cada short (guion, configuración y cortes)
 ├── biblioteca/           # Índice de licencias del material (indice.csv)
 ├── docs/                 # Bitácora de cada fase
 └── data/                 # NO se sube a Git
+    ├── entrada/          # Grabaciones para preparar_short (cualquier nombre)
     ├── bandeja/          # Audios nuevos (dispara el proceso)
     ├── archivo/          # Audios ya procesados
     ├── revision/         # Shorts terminados, pendientes de revisar
@@ -71,6 +121,7 @@ shorts-factory/
     ├── shorts/           # Archivos de trabajo de cada short
     ├── biblioteca/       # Vídeos, música, efectos y licencias
     ├── modelos/          # Modelos de Whisper
+    ├── cache/            # Búsquedas de Pixabay (24 horas)
     └── registro.log      # Registro del vigilante
 ```
 
@@ -99,6 +150,7 @@ docker build -f Dockerfile.whisper -t shorts-whisper .
 | 5 | `docs/05-subtitulos.md` |
 | 6 | `docs/06-montaje.md` |
 | 7 | `docs/07-automatizacion.md` |
+| 8 | `docs/08-agente.md` |
 
 ## Entorno
 
