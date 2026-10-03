@@ -1,11 +1,12 @@
 {
-  "palabras_por_segundo": 2.85,
+  "palabras_por_segundo": 2.9,
   "ultimas_muestras": 5,
   "muestras": [
     {"short": "001-pulpo", "palabras": 108, "segundos": 40.48},
     {"short": "002-caballo", "palabras": 115, "segundos": 40.38},
     {"short": "003-rayo", "palabras": 109, "segundos": 36.78},
     {"short": "004-elefante", "palabras": 120, "segundos": 45.32},
-    {"short": "005-caribe", "palabras": 121, "segundos": 41.74}
+    {"short": "005-caribe", "palabras": 121, "segundos": 41.74},
+    {"short": "006-columna", "palabras": 116, "segundos": 38.76}
   ]
 }
