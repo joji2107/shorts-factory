@@ -14,6 +14,7 @@ y una pregunta que invite a comentar.
 | 2 | Subtítulos con los colores de la marca y resaltado de las negritas del guion | `9a0c07e` |
 | 3 | Hoja para leer el guion (`scripts/para_leer.py`) y short 003-rayo | `73eaf2d` |
 | 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | `73eaf2d` |
+| 5 | Short 004-elefante (estudio original) y final del vídeo tras la última palabra | |
 
 ---
 
@@ -243,6 +244,52 @@ versión queda en `data/pruebas/003-rayo_v1.mp4`.
 En total entraron 23 clips de rayo en el índice (`rayo_01` a `rayo_23`; el mensaje del
 commit `73eaf2d` dice 13 por error).
 
+## Parte 5: 004-elefante
+
+### Verificación con el estudio original
+El dato venía de noticias ("los elefantes se llaman por su nombre"), así que se leyó
+el artículo entero: Pardo et al., *Nature Ecology & Evolution*, 2024
+(https://doi.org/10.1038/s41559-024-02420-w). La web de Nature pide sesión, así que se
+usó una copia del PDF; para leerlo hizo falta `pdftotext`, que se instaló solo dentro
+de un contenedor de usar y tirar (`docker run --rm ... apt-get install poppler-utils`),
+sin tocar la imagen ni el Mac.
+
+Lo que afirma y lo que no está en `shorts/004-elefante/guion.md`. Resumen: un modelo
+acertó a quién iba dirigida una llamada en el 27,5 % de los casos (8 % al azar), las
+llamadas probablemente no imitan al receptor (delfines y loros sí) y 17 elefantes
+reaccionaron antes a llamadas que eran para ellos. No se sabe qué parte del sonido es
+el "nombre", no todas las llamadas lo llevan y no está claro que todos usen el mismo
+para el mismo elefante. Por eso el guion dice "algo parecido a un nombre", "al
+parecer" y "quizá". Una de las fuentes (PBS) la firma el propio autor: se marcó como
+no independiente.
+
+### Clips
+Elegidos con `ver_candidatos` y sus miniaturas: 7 elefantes africanos grabados de
+verdad, ninguno de IA. Se descartó uno de elefantes asiáticos (el estudio es de
+africanos).
+
+### La grabación llegó antes que los clips
+El audio se dejó en la bandeja antes de descargar los clips: el vigilante lo apartó a
+`data/errores/` ("No hay vídeos con la etiqueta 'elefante'") sin tocar la receta. Con
+los clips ya en la biblioteca, bastó con devolverlo a la bandeja.
+
+### 8 segundos muertos al final
+La última palabra acababa en 45,5 s y el vídeo duraba 53,5 s: la grabación seguía
+5,5 s con ruido de fondo (de -40 a -48 dB, frente a -11/-16 dB de la voz) y un golpe al
+pararla, y el vídeo duraba "toda la grabación + 2,5 s". El paso `voz` solo recorta el
+silencio del principio. Ahora el vídeo acaba la cola (2,5 s) después de la **última
+palabra transcrita** (en un bucle, `tras_ultima_palabra`). La velocidad de lectura
+también se medía con toda la grabación (51 s, 2,35 palabras/s): ahora se mide de la
+primera palabra a la última, y se recalcularon las cuatro muestras (referencia 2,76).
+Resultado: 48,0 s, fundido de la música de 2,5 s desde la última palabra, -14,04 LUFS.
+La primera versión queda en `data/pruebas/004-elefante_v1.mp4`.
+
+### Música repetida
+004-elefante usa `curiosidad_01`, la misma que 001-pulpo: la skill solo evitaba la canción
+del short anterior. Se deja así, pero ahora la skill no repite ninguna canción de los
+últimos 5 shorts y elige la que lleva más tiempo sin usarse (si ninguna libre encaja,
+propone buscar música nueva).
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -262,6 +309,10 @@ commit `73eaf2d` dice 13 por error).
 | El bucle no enlazaba | El vídeo acababa casi 3 s después de la última palabra | `final.tras_ultima_palabra` y fundido de la música que no empieza antes de la última palabra | La skill lo pone en los guiones con bucle |
 | «Eso qué hay» en vez de «Eso que oyes» | Whisper lo oyó mal | Corregir los subtítulos con el guion | El guion como pista de Whisper no sirve (se salta frases) |
 | La transcripción murió sin mensaje | `grep` ocultaba el código de salida; era 137 (sin memoria) | Guardar la salida en un archivo y mirar `$?` | No filtrar con tuberías los comandos largos |
+| El vídeo del 004 tenía 8 s muertos al final | Duraba toda la grabación + la cola, y la grabación seguía 5,5 s después de la última frase | El vídeo acaba la cola después de la última palabra transcrita | La velocidad de lectura también se mide de la primera a la última palabra |
+| El 004 falló al llegar a la bandeja | La grabación llegó antes de descargar los clips | Devolver el audio de `data/errores/` a la bandeja tras descargarlos | Descargar los clips antes de grabar |
+| No se podía leer el PDF del estudio | El Mac no tiene poppler y la web de Nature pide sesión | `pdftotext` en un contenedor de usar y tirar | |
+| 004-elefante repitió la música de 001-pulpo | La skill solo evitaba la canción del short anterior | Ninguna canción de los últimos 5 shorts; la que lleva más tiempo sin usarse | Lista de músicas por orden de número en la skill |
 | [Añade aquí otros problemas] | | | |
 
 ## Herramientas aprendidas
@@ -280,6 +331,8 @@ commit `73eaf2d` dice 13 por error).
 | `xstack` | Hojas de contactos con varios fotogramas o miniaturas |
 | `silencedetect` | Medir el silencio del principio de un efecto |
 | Código de salida 137 | El sistema mató el proceso por falta de memoria |
+| `pdftotext` (poppler) en `docker run --rm` | Leer un PDF sin instalar nada en el Mac ni en la imagen |
+| `wave` e `int.from_bytes` | Medir el volumen de un WAV de 24 bits con la biblioteca estándar |
 
 ## Mis conclusiones
 - [Añade aquí qué te parece escribir títulos con curiosidad sin caer en el engaño]

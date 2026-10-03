@@ -19,7 +19,8 @@ Versión 5:
 - Con video.buscar_destellos, cada corte se mueve para que un destello (un rayo) caiga
   al principio del plano: en las tormentas grabadas de verdad casi todo el tiempo está
   oscuro y, con un punto al azar, muchos cortes salían sin rayo.
-- Con final.tras_ultima_palabra (bucle), los cortes llegan hasta ahí y no más.
+- Los cortes llegan hasta la cola después de la última palabra (o tras_ultima_palabra
+  en un bucle), como el render: no al final de la grabación.
 """
 import json
 import random
@@ -199,8 +200,8 @@ def crear_edl(json_palabras, voz, salida, biblioteca, config):
         raise RuntimeError("No hay cortes.txt en la receta ni lista de 'clips' en la configuración")
     palabras = json.loads(json_palabras.read_text(encoding="utf-8"))
     tras = config["final"].get("tras_ultima_palabra")
-    if tras is not None and palabras:
-        total = palabras[-1]["fin"] + tras          # bucle: el vídeo acaba ahí (como en render)
+    if palabras:                                    # el vídeo acaba ahí (como en render)
+        total = palabras[-1]["fin"] + (tras if tras is not None else config["final"]["cola"])
     else:
         total = duracion(voz) + config["final"]["cola"]
     puntos = puntos_de_corte(palabras, total, c)

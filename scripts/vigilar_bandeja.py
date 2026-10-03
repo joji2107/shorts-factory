@@ -22,7 +22,6 @@ from pathlib import Path
 import lectura
 import material
 from crear_short import RAIZ, crear, fusionar
-from pasos.utilidades import duracion
 
 DATA = RAIZ / "data"
 BANDEJA = DATA / "bandeja"
@@ -112,10 +111,12 @@ def material_despues_de_voz(nombre):
 
 
 def anotar_lectura(nombre):
-    """Añade la velocidad de lectura de esta grabación a config/lectura.json."""
+    """Añade la velocidad de lectura de esta grabación a config/lectura.json. Se mide de
+    la primera palabra a la última: el silencio o el ruido grabados después no cuentan."""
     trabajo = DATA / "shorts" / nombre
-    palabras = len(json.loads((trabajo / "palabras.json").read_text(encoding="utf-8")))
-    segundos = duracion(trabajo / "voz.wav")
+    transcritas = json.loads((trabajo / "palabras.json").read_text(encoding="utf-8"))
+    palabras = len(transcritas)
+    segundos = transcritas[-1]["fin"] - transcritas[0]["inicio"]
     esta, media = lectura.anadir_muestra(nombre, palabras, segundos)
     registrar(f"       Lectura: {palabras} palabras en {segundos:.1f} s ({esta:.2f} por segundo); "
               f"velocidad de referencia: {media:.2f}")

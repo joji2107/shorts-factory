@@ -23,8 +23,8 @@ Velocidad de lectura (`config/lectura.json`):
 Técnica de interacción de cada short:
 !`grep -H -m1 "Técnica de interacción" shorts/*/guion.md || true`
 
-Música de cada short:
-!`grep -H -o "musica/[a-z_0-9]*\.mp3" shorts/*/config.json || true`
+Música de cada short (por orden de número, sin los 9xx de prueba):
+!`grep -H -o "musica/[a-z_0-9]*\.mp3" shorts/[0-8]*/config.json | sort || true`
 
 Último número usado (sin contar los 9xx, que son pruebas):
 !`ls shorts data/archivo data/bandeja data/revision data/listos 2>/dev/null | grep -oE "^[0-8][0-9]{2}-" | sort | tail -1 || true`
@@ -135,9 +135,13 @@ reservada) y sin `clips` (los elige el vigilante con la duración real):
 Valídalo con `python -m json.tool` en Docker.
 
 **Música**: una canción cuyo estado de ánimo (primera etiqueta) encaje con el
-guion (curiosidad, misterio, alegria, relajada...), distinta de la del short
-anterior y que dure al menos la duración estimada + 3 s (mídela con ffprobe en
-Docker). Si ninguna encaja, dilo y propón buscar una.
+guion (curiosidad, misterio, alegria, relajada...) y que dure al menos la duración
+estimada + 3 s (mídela con ffprobe en Docker). Las canciones no se repiten tan
+rápido: **ninguna de los últimos 5 shorts** (mira la lista de arriba) y, entre las
+que encajan, la que lleve más tiempo sin usarse (primero las que no se han usado
+nunca). Si ninguna libre encaja, no repitas: dilo y propón buscar música nueva.
+(004-elefante repitió la de 001-pulpo porque antes solo se evitaba la del short
+anterior.)
 
 **Efectos**: `automaticos` = mín(3, redondeo(duración / 13,5)): uno cada 12-15 s,
 ninguno en los primeros 8 s (`inicio_min`) y como máximo 3. Suenan en los cortes que

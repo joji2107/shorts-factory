@@ -115,9 +115,11 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_
     """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos.
     fin_ultima_palabra: segundo en que acaba la última palabra (de la transcripción)."""
     tras = config["final"].get("tras_ultima_palabra")
-    if tras is not None and fin_ultima_palabra is not None:
-        # Bucle: el vídeo acaba poco después de la última palabra para enlazar con la primera
-        total = fin_ultima_palabra + tras
+    if fin_ultima_palabra is not None:
+        # El vídeo acaba la cola después de la última palabra, no al final de la grabación:
+        # lo que se grabe después (silencio, ruido al parar) se queda fuera. En un bucle,
+        # tras_ultima_palabra (0,5 s) para que enlace con la primera frase.
+        total = fin_ultima_palabra + (tras if tras is not None else config["final"]["cola"])
     else:
         total = duracion(voz) + config["final"]["cola"]
     if duracion(fondo) < total - 0.05:   # margen de un fotograma y poco más
