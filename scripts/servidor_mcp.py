@@ -23,6 +23,8 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
+import material
+
 RAIZ = Path(__file__).resolve().parent.parent
 DATA = RAIZ / "data"
 ENTRADA = DATA / "entrada"
@@ -43,10 +45,10 @@ servidor = MCPServer(
     "fabrica-shorts",
     version="1.0",
     instructions=(
-        "Herramientas de la fábrica de shorts. Para crear un short, usa "
-        "preparar_short con una grabación de data/entrada/ y un tema que exista "
-        "en temas_disponibles (si el tema no tiene clips, búscalos antes con buscar_clips); "
-        "el vigilante debe estar en marcha para que se procese. "
+        "Herramientas de la fábrica de shorts. Para crear un short: primero "
+        "evaluar_material con el tema y la duración aproximada; si falta material, "
+        "buscar_clips solo con los clips que falten; después preparar_short con una "
+        "grabación de data/entrada/. El vigilante debe estar en marcha para que se procese. "
         "Revisar y aprobar los vídeos (pasar de revision/ a listos/) lo decide el usuario."
     ),
 )
@@ -70,6 +72,21 @@ def _temas():
         if fila["tipo"].strip() == "video":
             contador.update(e for e in fila["etiquetas"].strip().split(";") if e)
     return contador
+
+
+def _generales_del_tema(tema, filas):
+    """Las etiquetas que comparten todos los vídeos de un tema, además del tema
+    (por ejemplo, 'animal' y 'mar' para 'pulpo'). Vacío si el tema es nuevo."""
+    conjuntos = [fila["etiquetas"].strip().split(";") for fila in filas
+                 if fila["tipo"].strip() == "video" and tema in fila["etiquetas"].strip().split(";")]
+    if not conjuntos:
+        return []
+    return [e for e in conjuntos[0] if e and e != tema and all(e in otro for otro in conjuntos[1:])]
+
+
+def _contar(n, palabra):
+    """'1 clip', '3 clips'."""
+    return f"{n} {palabra}" + ("" if n == 1 else "s")
 
 
 def _siguiente_numero():
@@ -240,6 +257,58 @@ def temas_disponibles() -> dict[str, int]:
 
 
 @servidor.tool()
+def evaluar_material(tema: str, duracion_segundos: float = 45) -> str:
+    """Dice si hay clips suficientes de un tema para un short de esa duración sin repetir
+    planos, cuántas veces se ha usado cada clip y, si falta material, cuántos clips más
+    hacen falta. Úsala antes de preparar_short y de buscar_clips."""
+    tema = tema.strip().lower()
+    if not 10 <= duracion_segundos <= 180:
+        return "La duración tiene que estar entre 10 y 180 segundos."
+    config = material.configuracion()
+    video = config["video"]
+    total = duracion_segundos + config["final"]["cola"]
+    try:
+        clips = material.clips_del_tema(tema)
+        durs = material.duraciones(clips)
+    except RuntimeError as e:
+        return str(e)
+    if not clips:
+        return (f"No hay ningún clip de '{tema}'. Para un short de {duracion_segundos:.0f} s hacen falta "
+                f"al menos {material.MIN_CLIPS} clips: búscalos con buscar_clips.")
+
+    shorts, cortes = material.usos()
+    lineas = [f"Tema '{tema}': {len(clips)} clips, {sum(durs.values()):.1f} s en total "
+              f"({sum(durs.values()) / total:.2f} veces un short de {total:.0f} s, contando "
+              f"{config['final']['cola']:g} s de cola)."]
+    lineas.append("Clips, de menos a más usados:")
+    for clip in sorted(clips, key=lambda c: (shorts[c], cortes[c], c)):
+        lineas.append(f"  {clip}: {durs[clip]:.1f} s, usado en {_contar(shorts[clip], 'short')} "
+                      f"({_contar(cortes[clip], 'corte')})")
+
+    escenarios = material.escenarios(total, video)
+    resultado = material.alcanza(durs, total, video)
+    lineas.append("¿Llega sin repetir planos? " + "; ".join(
+        f"{nombre} de {escenarios[nombre][0]:.1f} s: {'sí' if ok else 'no'}" for nombre, ok in resultado.items()))
+
+    estado = material.estado(durs, total, video)
+    if estado == "suficiente":
+        lineas.append("Estado: SUFICIENTE. No hace falta descargar nada; el vigilante elegirá los "
+                      "clips menos usados.")
+    else:
+        motivo = (f"hay menos de {material.MIN_CLIPS} clips distintos" if all(resultado.values())
+                  else "con cortes muy cortos se repetirían planos" if estado == "justo"
+                  else "se repetirían planos")
+        lineas.append(f"Estado: {estado.upper()} ({motivo}).")
+        faltan, tipica = material.clips_que_faltan(durs, total, video)
+        if faltan:
+            llamadas = -(-faltan // MAX_CLIPS)
+            lineas.append(f"{'Falta' if faltan == 1 else 'Faltan'} {_contar(faltan, 'clip')} de unos {tipica:.0f} s. "
+                          f"Con buscar_clips, cantidad "
+                          f"{min(faltan, MAX_CLIPS)}" + (f", en {llamadas} llamadas" if llamadas > 1 else "") + ".")
+    return "\n".join(lineas)
+
+
+@servidor.tool()
 def listar_shorts() -> list[dict]:
     """Los shorts que tienen receta en shorts/ y en qué estado está su vídeo."""
     resultado = []
@@ -284,11 +353,14 @@ def preparar_short(grabacion: str, tema: str) -> str:
 
 
 @servidor.tool()
-def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, otras_etiquetas: str = "") -> str:
+def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, etiquetas_generales: str = "") -> str:
     """Busca vídeos de 6 segundos o más en Pixabay (primero los verticales), los descarga
     a la biblioteca como <tema>_NN.mp4 y los registra en biblioteca/indice.csv con su licencia.
     La búsqueda va en inglés (por ejemplo, tema 'caballo' y búsqueda 'horse'). Máximo 5 clips.
-    otras_etiquetas es opcional, separadas por punto y coma (por ejemplo 'animal;campo').
+    Antes, usa evaluar_material para saber cuántos clips faltan y pide solo esos.
+    etiquetas_generales: una o dos categorías más amplias que el tema, en singular, sin
+    tildes y separadas por punto y coma (caballo -> 'animal'; pulpo -> 'animal;mar').
+    Si el tema ya existe y no se indican, se usan las que ya tiene.
     No vuelve a descargar vídeos que ya estén en el índice."""
     tema = tema.strip().lower()
     busqueda = busqueda_en_ingles.strip()
@@ -298,10 +370,20 @@ def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, otras_et
         return "Falta la búsqueda en inglés (por ejemplo, 'horse' para el tema 'caballo')."
     if not 1 <= cantidad <= MAX_CLIPS:
         return f"La cantidad tiene que estar entre 1 y {MAX_CLIPS} (no se permiten descargas masivas)."
-    extra = [e.strip().lower() for e in otras_etiquetas.split(";") if e.strip()]
-    if any(not re.fullmatch(r"[a-z0-9_]+", e) for e in extra):
-        return "Las otras etiquetas solo pueden tener minúsculas sin tildes, números y guiones bajos."
-    etiquetas = ";".join(dict.fromkeys([tema] + extra))           # el tema primero y sin repetir
+
+    filas = _filas_indice()
+    generales = [e.strip().lower() for e in etiquetas_generales.split(";") if e.strip()]
+    if not generales:
+        generales = _generales_del_tema(tema, filas)
+        if not generales:
+            return (f"'{tema}' es un tema nuevo: indica en etiquetas_generales una o dos categorías "
+                    f"más amplias, en singular y sin tildes (por ejemplo 'animal' o 'animal;mar').")
+    if any(not re.fullmatch(r"[a-z0-9_]+", e) for e in generales):
+        return "Las etiquetas generales solo pueden tener minúsculas sin tildes, números y guiones bajos."
+    generales = [e for e in dict.fromkeys(generales) if e != tema]
+    if not 1 <= len(generales) <= 2:
+        return "Indica una o dos etiquetas generales distintas del tema (por ejemplo 'animal')."
+    etiquetas = ";".join([tema] + generales)                       # el tema siempre primero
 
     fuente = FUENTES[FUENTE]
     clave = _clave(fuente["variable"])
@@ -309,7 +391,6 @@ def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, otras_et
         return (f"Falta la clave de {fuente['nombre']}: pega tu clave en el archivo .env "
                 f"({fuente['variable']}=...) y vuelve a registrar el servidor MCP con --env-file.")
 
-    filas = _filas_indice()
     ya_registradas = {fila["url"].strip().rstrip("/") for fila in filas}
     saltados = Counter()
     problema = None

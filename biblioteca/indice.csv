@@ -1,13 +1,27 @@
 archivo,tipo,fuente,autor,url,licencia,fecha,etiquetas
-pulpo_01.mp4,video,Pexels,Entdecker Fuchs,https://www.pexels.com/video/pulpa-aquarium-biarritz-17836505/,Pexels License,2026-10-01,pulpo;mar;animal
-pulpo_02.mp4,video,Pexels,Tom Fisk,https://www.pexels.com/video/video-of-an-octopus-underwater-1312397/,Pexels License,2026-10-01,pulpo;mar;animal
+pulpo_01.mp4,video,Pexels,Entdecker Fuchs,https://www.pexels.com/video/pulpa-aquarium-biarritz-17836505/,Pexels License,2026-10-01,pulpo;animal;mar
+pulpo_02.mp4,video,Pexels,Tom Fisk,https://www.pexels.com/video/video-of-an-octopus-underwater-1312397/,Pexels License,2026-10-01,pulpo;animal;mar
 pulpo_03.mp4,video,Pexels,Jun Ho Lee,https://www.pexels.com/video/captivating-underwater-octopus-footage-34138211/,Pexels License,2026-10-01,pulpo;animal;mar
 pulpo_04.mp4,video,Pexels,Margaret,https://www.pexels.com/video/camouflaged-octopus-in-shallow-water-36924657/,Pexels License,2026-10-01,pulpo;animal;mar
-pulpo_05.mp4,video,Pexels,Jun Ho Lee,https://www.pexels.com/video/stunning-underwater-octopus-hidden-in-reef-34944466/,Pixel License,2026-10-01,pulpo;animal;mar
-curiosidad_01.mp3,musica,Pixabay,AntipodeanWriter,https://pixabay.com/music/...,Pixabay Content License,2026-10-01,curiosidad;rnb;moderna
+pulpo_05.mp4,video,Pexels,Jun Ho Lee,https://www.pexels.com/video/stunning-underwater-octopus-hidden-in-reef-34944466/,Pexels License,2026-10-01,pulpo;animal;mar
+curiosidad_01.mp3,musica,Pixabay,AntipodeanWriter,https://pixabay.com/music/electronic-modern-rnb-curiosity-15480/,Pixabay Content License,2026-10-01,curiosidad;rnb;moderna
 whoosh_01.mp3,sfx,Pixabay,RibhavAgrawal,https://pixabay.com/sound-effects/film-special-effects-woosh-230554/,Pixabay Content License,2026-10-01,whoosh;sfx;transicion
 whoosh_02.mp3,sfx,Pixabay,Liecio,https://pixabay.com/sound-effects/film-special-effects-woosh-building-109596/,Pixabay Content License,2026-10-01,whoosh;sfx;transicion;enfasis
-caballo_01.mp4,video,Pixabay,SabbirShowBiz,https://pixabay.com/videos/id-184510/,Pixabay Content License,2026-10-03,caballo
-caballo_02.mp4,video,Pixabay,Shravan1991,https://pixabay.com/videos/id-206294/,Pixabay Content License,2026-10-03,caballo
-caballo_03.mp4,video,Pixabay,MustaKor,https://pixabay.com/videos/id-273298/,Pixabay Content License,2026-10-03,caballo
-caballo_04.mp4,video,Pixabay,SkyScapeDrone,https://pixabay.com/videos/id-206140/,Pixabay Content License,2026-10-03,caballo
+caballo_01.mp4,video,Pixabay,SabbirShowBiz,https://pixabay.com/videos/id-184510/,Pixabay Content License,2026-10-03,caballo;animal;noche
+caballo_02.mp4,video,Pixabay,Shravan1991,https://pixabay.com/videos/id-206294/,Pixabay Content License,2026-10-03,caballo;animal;nieve
+caballo_03.mp4,video,Pixabay,MustaKor,https://pixabay.com/videos/id-273298/,Pixabay Content License,2026-10-03,caballo;animal;granja
+caballo_04.mp4,video,Pixabay,SkyScapeDrone,https://pixabay.com/videos/id-206140/,Pixabay Content License,2026-10-03,caballo;animal;campo
+alegria_01.mp3,musica,Pixabay,prettyjohn1,https://pixabay.com/music/happy-childrens-tunes-fun-fun-music-74sec-599068/,Pixabay Content License,2026-10-03,alegria;infantil;divertido
+relajada_01.mp3,musica,Pixabay,vibemode,https://pixabay.com/music/religious-theme-summer-fun-589839/,Pixabay Content License,2026-10-03,relajada;juvenil;vibe;chill;divertido
+alegria_02.mp3,musica,Pixabay,DesiFreeMusic,https://pixabay.com/music/bloopers-fail-sound-comedy-reaction-309057/,Pixabay Content License,2026-10-03,alegria;divertido;vibe;gracioso
+alegria_03.mp3,musica,Pixabay,JorisVermeer,https://pixabay.com/music/amusement-park-trumpet-tumbles-comedy-brass-530221/,Pixabay Content License,2026-10-03,alegria;divertido;trompeta;curiosidad
+misterio_01.mp3,musica,Pixabay,fidelfortune,https://pixabay.com/music/modern-classical-beautiful-piano-misterious-piano-piece-304452/,Pixabay Content License,2026-10-03,misterio;curiosidad;epica;piano
+misterio_02.mp3,musica,Pixabay,Christian Bodhi,https://pixabay.com/music/search/misterious/,Pixabay Content License,2026-10-03,misterio;futurista;sintetizador;curiosidad
+misterio_03.mp3,musica,Pixabay,fidelfortune,https://pixabay.com/music/ambient-mistery-dark-mellow-m%C3%A9lody-voice-and-sound-female-voice-228191/,Pixabay Content License,2026-10-03,misterio;epica;voz
+relajada_02.mp3,musica,Pixabay,prettyjohn1,https://pixabay.com/music/old-school-hip-hop-background-background-music-595182/,Pixabay Content License,2026-10-03,relajada;hiphop;chill;vibe;divertido
+riser_01.mp3,sfx,Pixabay,u_1pruylktlg,https://pixabay.com/sound-effects/film-special-effects-riser-7-130957/,Pixabay Content License,2026-10-03,riser;sfx;impacto;tension
+riser_02.mp3,sfx,Pixabay,ALEXIS_GAMING_CAM,https://pixabay.com/sound-effects/film-special-effects-riser-paper-415195/,Pixabay Content License,2026-10-03,riser;sfx;voltage;paper;impacto;tension
+ding_01.mp3,sfx,Pixabay,freesound_community,https://pixabay.com/sound-effects/film-special-effects-ding-101492/,Pixabay Content License,2026-10-03,ding;sfx;idea;highlight;divertido
+ding_02.mp3,sfx,Pixabay,freesound_community,https://pixabay.com/sound-effects/film-special-effects-ding-36029/,Pixabay Content License,2026-10-03,ding;sfx;punto;videojuego;divertido;nivel
+error_01.mp3,sfx,Pixabay,Shagor Miah,https://pixabay.com/sound-effects/film-special-effects-error-126627/,Pixabay Content License,2026-10-03,error;sfx;divertido;fallo;juego
+error_02.mp3,sfx,Pixabay,freesound_community,https://pixabay.com/sound-effects/film-special-effects-windows-error-sound-effect-35894/,Pixabay Content License,2026-10-03,error;sfx;divertido;windows;fallo

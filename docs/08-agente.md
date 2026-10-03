@@ -21,6 +21,7 @@ se usa `print()`: cualquier texto suelto rompería la comunicación.
 | `preparar_short` | Copia una grabación de `data/entrada/` a la bandeja con el siguiente número libre |
 | `ver_error` | El `.log` de un short que ha fallado |
 | `buscar_clips` | (parte 3) Busca clips, los descarga a la biblioteca y los registra en el índice |
+| `evaluar_material` | (parte 4) Dice si hay clips suficientes para un short y cuántos faltan |
 
 El servidor no fabrica shorts: deja el audio en la bandeja y el vigilante hace
 el resto. Pasar un vídeo de `revision/` a `listos/` lo decido siempre yo.
@@ -34,13 +35,13 @@ Se lo pido a Claude en lenguaje normal ("busca 4 clips de caballos") y Claude
 llama a la herramienta:
 
 ```
-buscar_clips(tema="caballo", busqueda_en_ingles="horse", cantidad=4, otras_etiquetas="animal")
+buscar_clips(tema="caballo", busqueda_en_ingles="horse", cantidad=4, etiquetas_generales="animal")
 ```
 
 - `tema`: la etiqueta con la que el vigilante encontrará los clips (minúsculas sin tildes).
 - `busqueda_en_ingles`: lo que se busca en la API (los resultados son mejores en inglés).
 - `cantidad`: de 1 a 5.
-- `otras_etiquetas`: opcional, separadas por punto y coma.
+- `etiquetas_generales`: una o dos categorías más amplias, separadas por punto y coma (ver parte 4).
 
 ### Qué hace, paso a paso
 1. Pide a la API de vídeos de Pixabay hasta 3 páginas de resultados (50 por página).
@@ -53,7 +54,7 @@ buscar_clips(tema="caballo", busqueda_en_ingles="horse", cantidad=4, otras_etiqu
 5. Descarga cada clip como `data/biblioteca/video/<tema>_NN.mp4`, siguiendo la
    numeración que ya exista (mira a la vez la carpeta y el índice).
 6. Añade su línea a `biblioteca/indice.csv` con las 8 columnas:
-   `archivo,video,Pixabay,autor,url,Pixabay Content License,AAAA-MM-DD,tema;otras`.
+   `archivo,video,Pixabay,autor,url,Pixabay Content License,AAAA-MM-DD,tema;generales`.
 
 Detalles de seguridad:
 - La descarga se hace a un archivo `.part` que se renombra al terminar: nunca
@@ -183,6 +184,105 @@ Consultado en pixabay.com/api/docs y pixabay.com/service/license-summary:
 
 ---
 
+## Parte 4: cuántos clips necesita un short
+
+### El problema
+Hasta ahora el vigilante usaba **todos** los clips del tema, sin saber si
+llegaban. Con una biblioteca pequeña se repetían planos; con una grande, todos
+los shorts del tema se parecerían, porque siempre salían los mismos clips en el
+mismo orden y empezando en el segundo 0.
+
+### Cuánto material hace falta (y por qué no basta 1,6 veces)
+La idea de partida era pedir al menos 6 clips y 1,6 veces la duración del short.
+Al revisar `cortes.py` y simular su reparto con las duraciones reales salió que
+**se gasta más material del que parece**, por dos motivos:
+
+- **El margen**: entre dos usos de un clip se saltan 0,5 s para no repetir
+  plano. Con cortes de 1,5 s eso es un 33 % más.
+- **El final de cada clip se pierde**: un clip solo se usa si le cabe el corte
+  entero. De un clip de 7 s sale un corte de 4 s (+0,5 s de margen) y los
+  2,5 s que quedan no sirven para el siguiente.
+
+Material necesario para un short de 45 s, en el peor caso (cortes de 1,5 a 4 s):
+
+| Clips de | 6-8 s | 10 s | 12-15 s | 20 s |
+|---|---|---|---|---|
+| Hace falta | ~2,0 veces | 1,74 veces | ~1,6 veces | 1,74 veces |
+
+Como depende tanto de lo que dure cada clip, en vez de una proporción fija se
+**simula el reparto real** (`repartir()` de `cortes.py`) con tres maneras de
+cortar el short: todo con cortes mínimos (`corte_min`), medios y máximos
+(`corte_max`). Con la transcripción de 001-pulpo salieron cortes de 1,6 a
+3,9 s (media 2,7 s), así que hay que contar con los dos extremos.
+
+| Estado | Condición |
+|---|---|
+| Suficiente | Al menos 6 clips distintos y llega sin repetir planos en los tres casos |
+| Justo | Menos de 6 clips, o solo falla con cortes mínimos |
+| Insuficiente | Falla también con cortes medios o máximos |
+
+Regla rápida para explicarlo: unas **2 veces** la duración del short.
+
+### `evaluar_material(tema, duracion_segundos=45)`
+Nueva herramienta MCP. Da los clips del tema con su duración y cuántas veces se
+han usado (en cuántos shorts y en cuántos cortes, mirando los `cortes.txt` de
+`shorts/` y los `cortes_auto.txt` de `data/shorts/`), si llega en cada caso, el
+estado y, si falta material, cuántos clips más hacen falta (simula añadir clips
+de la duración mediana del tema). Con la biblioteca actual:
+
+- `pulpo`: 5 clips, 69,5 s (1,51 veces un short de 46 s). Llega en los tres
+  casos, pero es **justo** por tener menos de 6 clips: falta 1.
+- `caballo`: 4 clips, 45,9 s (1,00 veces). **Insuficiente**: faltan 2 clips.
+
+Regla en `CLAUDE.md`: antes de preparar un short, usar `evaluar_material` y
+descargar solo los clips que falten.
+
+### Selección de clips en el vigilante
+La lógica común está en `scripts/material.py`, que usan el vigilante y el
+servidor (por eso tampoco tiene `print()`). Si la receta no dice qué clips
+usar, el vigilante:
+
+1. Calcula la duración del short con `ffprobe` sobre el audio más la cola
+   (sale algo más larga, porque aún no se ha recortado el silencio del
+   principio: el margen va a favor).
+2. Ordena los clips del tema de menos a más usados, al azar entre empatados.
+3. Coge los mínimos que den *suficiente* (nunca menos de 6). Si ni con todos
+   llega, usa todos y lo anota en el registro con un `AVISO`.
+4. Escribe la lista en la receta: al rehacer el short se usan los mismos clips.
+
+Prueba con un tema simulado de 12 clips: para 46 s elige 6, distintos en cada
+intento y dejando fuera los ya usados; para 90 s elige 10.
+
+### Cada clip empieza en un punto al azar
+`cortes.py` (versión 4) separa el reparto (`repartir()`, que ya no imprime y se
+puede simular desde el servidor) de la escritura. Después, `desplazar()` suma a
+todos los cortes de un clip el mismo desfase al azar, entre 0 y lo que le sobra
+al final. El reparto y el material necesario no cambian, pero el primer plano
+de un clip ya no se repite en todos los shorts que lo usan.
+
+Comprobaciones:
+- Antes de añadir el desfase, `md5` idéntico de `cortes_auto.txt` antes y
+  después de separar `repartir()` (la refactorización no cambia nada).
+- Con 20 semillas: ningún corte se pasa del final de su clip y `pulpo_01`
+  empieza en 19 puntos distintos. El desfase se redondea **hacia abajo** a
+  fotogramas enteros, para no pasarse del final por medio fotograma.
+
+### Etiquetas generales
+`buscar_clips` sustituye `otras_etiquetas` por `etiquetas_generales`: una o dos
+categorías más amplias que el tema, en singular y sin tildes (caballo →
+`animal`). Si el tema ya existe y no se indican, reutiliza las que comparten
+todos sus clips; si es nuevo, son obligatorias. El código comprueba las tildes
+y el número, pero no el singular (no se puede saber de forma fiable: "mar" o
+"pais" no son plurales), eso lo pide la descripción de la herramienta.
+
+Cambios en el índice (con permiso):
+- Pulpos: todos con `pulpo;animal;mar` (antes había dos órdenes distintos).
+- Caballos: además de `animal`, una descriptiva según su imagen: `caballo_01`
+  `noche` (silueta con la luna), `caballo_02` `nieve`, `caballo_03` `granja`
+  (establo) y `caballo_04` `campo`.
+
+---
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -191,6 +291,8 @@ Consultado en pixabay.com/api/docs y pixabay.com/service/license-summary:
 | La clave podría salir en un mensaje de error | Pixabay la pide dentro de la URL y las excepciones de `urllib` guardan la URL | Mensajes solo con el código de error, lanzados fuera del `except` | Probar los errores con una clave falsa y buscarla en el texto |
 | `buscar_clips` no aparecía en Claude Code | El servidor se había arrancado antes de añadir la herramienta y sin `--env-file` | Volver a registrarlo y reiniciar Claude Code | Reiniciar tras cambiar el código o el registro del servidor |
 | Un script de prueba no aparecía dentro del contenedor | Colima solo comparte la carpeta de usuario, no `/private/tmp` | Pasar el script por la entrada estándar (`docker run -i ... python - < script.py`) | |
+| Con 1,6 veces la duración del short se repetían planos | Cada corte gasta 0,5 s de margen y se pierde el final de cada clip | Simular el reparto real con cortes mínimos, medios y máximos | Comprobar los números de partida con una simulación |
+| El servidor no podía usar `asignar_clips` | Imprimía avisos con `print()`, que rompe la comunicación MCP | Separar `repartir()`, que devuelve los avisos | `md5` para comprobar que la refactorización no cambia el resultado |
 | [Añade aquí otros problemas] | | | |
 
 ## Herramientas aprendidas
@@ -214,4 +316,6 @@ Consultado en pixabay.com/api/docs y pixabay.com/service/license-summary:
 ## Pendiente
 - Poner los créditos ("Vídeos: <autor> en Pixabay") en la descripción de cada short.
 - Añadir Pexels como segunda fuente cuando vuelva a dar claves.
+- Aviso: `musica/relajada_02.mp3` dura 47,9 s (medido con `ffprobe`), menos de
+  los 50 s recomendados. Solo sirve para shorts de unos 45 s como mucho.
 - [Añade aquí otros pendientes]

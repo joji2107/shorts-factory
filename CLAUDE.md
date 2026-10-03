@@ -48,13 +48,15 @@ Las rutas de las configuraciones (`audio_original`, `musica.archivo`, `efectos.a
 - `voz.py`: recorte (`inicio` numérico o `"auto"` con `silencedetect`) y cadena de filtros de `config.voz.cadena`. Pasa a mono **al principio** de la cadena (si no, la normalización pierde 3 dB).
 - `transcripcion.py`: faster-whisper en CPU (`int8`, 2 hilos) → `palabras.json` con tiempos por palabra (+ `.srt`).
 - `subtitulos.py`: agrupa palabras (máx. palabras, pausas, puntuación) en un `.ass` de 1080x1920.
-- `cortes.py`: si la receta **no** tiene `cortes.txt` manual, genera `cortes_auto.txt` cortando en la mejor pausa de cada tramo (`corte_min`–`corte_max`, puntuando finales de frase) y reparte los clips por turnos sin repetir plano. También elige dónde van los efectos automáticos. Con `cortes.txt` manual, el paso `fondo` no depende de la transcripción.
+- `cortes.py`: si la receta **no** tiene `cortes.txt` manual, genera `cortes_auto.txt` cortando en la mejor pausa de cada tramo (`corte_min`–`corte_max`, puntuando finales de frase) y reparte los clips por turnos sin repetir plano (`repartir()`, que no imprime y se puede simular; 0,5 s de margen entre usos de un clip). Después `desplazar()` mueve los cortes de cada clip un desfase al azar dentro de lo que le sobra, para que no empiece siempre en el segundo 0. También elige dónde van los efectos automáticos. Con `cortes.txt` manual, el paso `fondo` no depende de la transcripción.
 - `montaje.py`: `generar_fondo` corta cada línea de la EDL (redondeada a fotogramas, `-frames:v`) y los concatena; `render` mezcla voz/música/efectos en `mezcla.wav`, mide, aplica la ganancia exacta + `alimiter` (no un segundo `loudnorm`, que caía en modo dinámico) y graba los subtítulos.
 - `utilidades.py`: `ejecutar()` (lanza un comando y lanza `RuntimeError` si falla) y `duracion()` (ffprobe).
 
 **Lista de cortes (EDL)**: una línea por corte, `clip inicio [largo]`; `clip` es el nombre sin extensión de `data/biblioteca/video/<clip>.mp4`. Sin `largo` se usa `video.segundos_corte`.
 
-**Biblioteca**: `biblioteca/indice.csv` (en Git) registra la licencia de cada archivo con 8 columnas: `archivo,tipo,fuente,autor,url,licencia,fecha,etiquetas` (etiquetas separadas por `;`). El vigilante elige los clips cuyo `tipo` es `video` y cuyas etiquetas contienen el tema del nombre del audio (`002-caballo` → `caballo`), y valida que cada línea tenga todas las columnas. Los archivos multimedia viven en `data/biblioteca/{video,musica,sfx,licencias}`.
+**Biblioteca**: `biblioteca/indice.csv` (en Git) registra la licencia de cada archivo con 8 columnas: `archivo,tipo,fuente,autor,url,licencia,fecha,etiquetas` (etiquetas separadas por `;`). Las etiquetas de un vídeo empiezan por el tema, siguen con una o dos generales (singular, sin tildes: `animal`, `mar`) y pueden acabar con descriptivas (`noche`, `nieve`). El vigilante toma los vídeos cuyo `tipo` es `video` y cuyas etiquetas contienen el tema del nombre del audio (`002-caballo` → `caballo`), y valida que cada línea tenga todas las columnas.
+
+**Material** (`scripts/material.py`, común al vigilante y al servidor; sin `print()`): mide los clips, cuenta sus usos (`cortes.txt` de las recetas y `cortes_auto.txt` de `data/shorts/`) y simula el reparto con cortes de `corte_min`, de la media y de `corte_max`. Es *suficiente* si llega en los tres casos y hay al menos 6 clips; *justo* si solo falla con cortes mínimos o hay menos de 6. No se usa una proporción fija: con clips de 6-10 s hacen falta unas 2 veces la duración del short (margen de 0,5 s por corte y final de cada clip desaprovechado). Si la receta no tiene `clips` ni `cortes.txt`, el vigilante elige con `elegir_clips()` los mínimos que den *suficiente* (al menos 6), empezando por los menos usados y al azar entre empatados, y los escribe en la receta (al rehacer se usan los mismos). Los archivos multimedia viven en `data/biblioteca/{video,musica,sfx,licencias}`.
 
 **Almacenamiento**: `data/` no va a Git. Los cortes sueltos se borran al unirlos; al terminar un short el vigilante borra `fondo.mp4` y `mezcla.wav` y mueve `final.mp4` (no lo copia). Se conservan `voz.wav` y los archivos de texto para retocar sin volver a transcribir. `data/archivo/` (grabaciones originales) nunca se borra. Un audio nuevo en la bandeja siempre rehace todo desde la voz.
 
@@ -66,7 +68,8 @@ Las rutas de las configuraciones (`audio_original`, `musica.archivo`, `efectos.a
 - `listar_shorts`: las recetas de `shorts/` y el estado de su vídeo.
 - `preparar_short(grabacion, tema)`: copia una grabación de `data/entrada/` a la bandeja como `NNN-tema` con el siguiente número libre (los 9xx se reservan para pruebas).
 - `ver_error(nombre)`: el `.log` de `data/errores/`.
-- `buscar_clips(tema, busqueda_en_ingles, cantidad=4, otras_etiquetas="")`: busca en la API de vídeos de Pixabay clips de 6 s o más (primero los verticales; los horizontales sirven por el fondo desenfocado), descarga de cada uno la versión más pequeña cuyo lado corto sea de 1080 px o más (si no hay, la mayor) como `data/biblioteca/video/<tema>_NN.mp4` y añade su línea a `biblioteca/indice.csv`. Salta los vídeos cuya url ya está en el índice. Máximo 5 por llamada.
+- `evaluar_material(tema, duracion_segundos=45)`: clips del tema con su duración y usos, si llegan sin repetir planos (estado *suficiente*, *justo* o *insuficiente*) y cuántos clips más harían falta.
+- `buscar_clips(tema, busqueda_en_ingles, cantidad=4, etiquetas_generales="")`: busca en la API de vídeos de Pixabay clips de 6 s o más (primero los verticales; los horizontales sirven por el fondo desenfocado), descarga de cada uno la versión más pequeña cuyo lado corto sea de 1080 px o más (si no hay, la mayor) como `data/biblioteca/video/<tema>_NN.mp4` y añade su línea a `biblioteca/indice.csv`. Etiquetas: el tema y una o dos generales (si el tema ya existe y no se indican, reutiliza las que comparten sus clips; si es nuevo, son obligatorias). Salta los vídeos cuya url ya está en el índice. Máximo 5 por llamada.
 
 Cada fuente de clips es una función (`_buscar_pixabay`) registrada en `FUENTES`, que devuelve los vídeos en un formato común; elegir versión, descargar, numerar y registrar es común. Pexels se podrá añadir así cuando vuelva a dar claves.
 
@@ -94,5 +97,7 @@ Cada fase tiene su bitácora en `docs/` (objetivo, comandos, problemas y solucio
 - Después de editar código, comprueba la sintaxis:
   `python -m compileall -q /proyecto/scripts`.
 - Después de editar un JSON, valídalo con `python -m json.tool`.
+- Antes de preparar un short, usa `evaluar_material` con su tema y duración, y descarga
+  con `buscar_clips` solo los clips que falten (los que diga `evaluar_material`).
 - Documenta cada cambio importante en `docs/`.
 - Trabajo con ramas: una por fase. No hagas commits ni push sin preguntarme.

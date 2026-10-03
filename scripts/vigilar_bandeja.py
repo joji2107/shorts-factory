@@ -12,7 +12,6 @@ Flujo:
 Todo queda anotado en data/registro.log.
 """
 import argparse
-import csv
 import json
 import shutil
 import time
@@ -20,7 +19,9 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from crear_short import RAIZ, crear
+import material
+from crear_short import RAIZ, crear, fusionar
+from pasos.utilidades import duracion
 
 DATA = RAIZ / "data"
 BANDEJA = DATA / "bandeja"
@@ -47,26 +48,6 @@ def esta_completo(archivo, espera=3):
     return tamano > 0 and archivo.stat().st_size == tamano
 
 
-def clips_por_tema(tema):
-    """Busca en el índice de la biblioteca los vídeos con esa etiqueta."""
-    indice = RAIZ / "biblioteca" / "indice.csv"
-    with indice.open(encoding="utf-8-sig", newline="") as f:
-        lector = csv.DictReader(f)
-        filas = list(lector)
-    # Cada línea debe tener tantas columnas como la cabecera
-    for numero, fila in enumerate(filas, start=2):
-        if None in fila or None in fila.values():
-            raise RuntimeError(
-                f"La línea {numero} de biblioteca/indice.csv no tiene "
-                f"{len(lector.fieldnames)} columnas ({', '.join(lector.fieldnames)})"
-            )
-    return [
-        Path(fila["archivo"]).stem
-        for fila in filas
-        if fila["tipo"].strip() == "video" and tema in fila["etiquetas"].strip().split(";")
-    ]
-
-
 def preparar_receta(nombre, audio, plantilla):
     """Crea (o actualiza) shorts/<nombre>/config.json a partir de la plantilla."""
     receta = RAIZ / "shorts" / nombre
@@ -79,15 +60,25 @@ def preparar_receta(nombre, audio, plantilla):
 
     config["audio_original"] = str(audio.relative_to(RAIZ))
 
-    # Si la receta no dice qué clips usar, se eligen por el tema del nombre
+    # Si la receta no dice qué clips usar, se eligen por el tema del nombre: solo los
+    # que necesita el short, empezando por los menos usados (al azar entre empatados).
+    # Quedan escritos en la receta, así que al rehacer el short se usan los mismos.
     tiene_clips = config.get("video", {}).get("clips")
     if not tiene_clips and not (receta / "cortes.txt").exists():
         tema = nombre.split("-", 1)[-1]          # "002-caballo" -> "caballo"
-        clips = clips_por_tema(tema)
+        completa = fusionar(json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8")), config)
+        # El audio aún tiene el silencio del principio: el short saldrá algo más corto (margen a favor)
+        total = duracion(audio) + completa["final"]["cola"]
+        clips, estado = material.elegir_clips(tema, total, completa)
         if not clips:
             raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv")
         config.setdefault("video", {})["clips"] = clips
-        registrar(f"       {len(clips)} clips con la etiqueta '{tema}': {', '.join(clips)}")
+        disponibles = len(material.clips_del_tema(tema))
+        registrar(f"       {len(clips)} de {disponibles} clips de '{tema}' para {total:.0f} s "
+                  f"(material {estado}): {', '.join(clips)}")
+        if estado != "suficiente":
+            registrar(f"       AVISO: material {estado} para '{tema}' (menos de {material.MIN_CLIPS} "
+                      f"clips o se repetirían planos). Usa evaluar_material para ver cuántos faltan")
 
     receta.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -10,12 +10,18 @@ Versión 2:
 Versión 3:
 - Elige automáticamente dónde poner los efectos de sonido: en los cortes que
   coinciden con las pausas más marcadas del guion (cambios de bloque).
+
+Versión 4:
+- El reparto (repartir) no imprime nada, para poder simularlo desde el servidor MCP.
+- Cada clip empieza en un punto al azar (desplazar), no siempre en el segundo 0.
 """
 import json
+import random
 
 from .utilidades import duracion
 
 FPS = 30
+MARGEN = 0.5        # segundos que se saltan entre dos usos de un clip, para no repetir plano
 FIN_FRASE = (".", "?", "!")
 PAUSA_SUAVE = (",", ";", ":")
 
@@ -68,15 +74,15 @@ def puntos_de_corte(palabras, total, c):
     return [a_fotograma(p) for p in puntos]
 
 
-def asignar_clips(puntos, clips, biblioteca):
-    """Reparte los clips por turnos, sin repetir plano mientras quede material."""
-    duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in clips}
+def repartir(largos, clips, duraciones):
+    """Reparte los clips por turnos, sin repetir plano mientras quede material.
+    No imprime nada: devuelve la lista de cortes y los avisos, para que también
+    se pueda usar desde el servidor MCP (que no admite print) para simular un short."""
     posicion = {clip: 0.0 for clip in clips}
-    edl = []
+    edl, avisos = [], []
     anterior = None
     turno = 0
-    for n in range(len(puntos) - 1):
-        largo = puntos[n + 1] - puntos[n]
+    for largo in largos:
         disponibles = [cl for cl in clips if cl != anterior] or clips
 
         # Por turnos, el primer clip distinto del anterior al que le quede material sin usar
@@ -92,14 +98,38 @@ def asignar_clips(puntos, clips, biblioteca):
             # Todos agotados: se reutiliza desde el principio el clip más largo
             elegido = max(disponibles, key=lambda cl: duraciones[cl])
             posicion[elegido] = 0.0
-            print(f"   AVISO: material agotado, se repite {elegido} desde el principio")
+            avisos.append(f"material agotado, se repite {elegido} desde el principio")
         if duraciones[elegido] < largo:
-            print(f"   AVISO: {elegido} dura menos que el corte ({largo:.1f} s)")
+            avisos.append(f"{elegido} dura menos que el corte ({largo:.1f} s)")
 
         edl.append((elegido, posicion[elegido], largo))
-        posicion[elegido] += largo + 0.5   # 0,5 s de margen para no repetir plano
+        posicion[elegido] += largo + MARGEN
         anterior = elegido
-    return edl
+    return edl, avisos
+
+
+def asignar_clips(puntos, clips, biblioteca):
+    """Mide los clips, los reparte entre los cortes y avisa si falta material."""
+    duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in clips}
+    largos = [b - a for a, b in zip(puntos, puntos[1:])]
+    edl, avisos = repartir(largos, clips, duraciones)
+    for aviso in avisos:
+        print(f"   AVISO: {aviso}")
+    return desplazar(edl, duraciones)
+
+
+def desplazar(edl, duraciones, azar=random):
+    """Mueve todos los cortes de cada clip el mismo desfase al azar, dentro de lo
+    que sobra al final del clip. El reparto no cambia (ni el material que hace
+    falta), pero el clip ya no empieza siempre en el segundo 0: si sale en
+    varios shorts, el primer plano no se repite."""
+    final = {}
+    for clip, inicio, largo in edl:
+        final[clip] = max(final.get(clip, 0.0), inicio + largo)
+    # Hacia abajo, a fotogramas enteros: así el último corte nunca se pasa del final del clip
+    desfase = {clip: int(azar.uniform(0, max(0.0, duraciones[clip] - fin)) * FPS) / FPS
+               for clip, fin in final.items()}
+    return [(clip, inicio + desfase[clip], largo) for clip, inicio, largo in edl]
 
 
 def crear_edl(json_palabras, voz, salida, biblioteca, config):
