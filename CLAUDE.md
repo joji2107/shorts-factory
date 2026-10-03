@@ -58,6 +58,19 @@ Las rutas de las configuraciones (`audio_original`, `musica.archivo`, `efectos.a
 
 **Almacenamiento**: `data/` no va a Git. Los cortes sueltos se borran al unirlos; al terminar un short el vigilante borra `fondo.mp4` y `mezcla.wav` y mueve `final.mp4` (no lo copia). Se conservan `voz.wav` y los archivos de texto para retocar sin volver a transcribir. `data/archivo/` (grabaciones originales) nunca se borra. Un audio nuevo en la bandeja siempre rehace todo desde la voz.
 
+## Servidor MCP
+
+`scripts/servidor_mcp.py` da a Claude herramientas concretas sobre la fábrica:
+- `estado_fabrica`: qué hay en bandeja, revisión, listos, errores y `data/entrada/`, más las últimas líneas de `registro.log`.
+- `temas_disponibles`: etiquetas de vídeo de `biblioteca/indice.csv` y cuántos clips tiene cada una.
+- `listar_shorts`: las recetas de `shorts/` y el estado de su vídeo.
+- `preparar_short(grabacion, tema)`: copia una grabación de `data/entrada/` a la bandeja como `NNN-tema` con el siguiente número libre (los 9xx se reservan para pruebas).
+- `ver_error(nombre)`: el `.log` de `data/errores/`.
+
+No crea shorts directamente: `preparar_short` solo deja el audio en la bandeja, y el vigilante (que tiene que estar en marcha) hace el resto, igual que si el usuario hubiera dejado el archivo a mano. Pasar de `revision/` a `listos/` lo decide siempre el usuario.
+
+El servidor se comunica con Claude por stdio, así que **nunca se usa `print()`** en él: cualquier texto en la salida estándar rompería la comunicación. Las herramientas devuelven el resultado con `return`.
+
 ## Documentación
 
 Cada fase tiene su bitácora en `docs/` (objetivo, comandos, problemas y soluciones, qué he aprendido). Los huecos entre corchetes del tipo `[Añade aquí...]` o `[completa con...]` son para que los rellene el autor; no inventar su contenido. Al cerrar una fase se actualiza la lista de estado y la tabla de documentos del `README.md`.

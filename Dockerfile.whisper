@@ -8,13 +8,17 @@ RUN apt-get update \
 
 # Entorno virtual propio e instalación de faster-whisper dentro de él
 RUN python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir faster-whisper "av==18.1.0"
+    && /opt/venv/bin/pip install --no-cache-dir faster-whisper "av==18.1.0" "mcp>=2,<3"
 
 # El python del entorno virtual pasa a ser el que se usa por defecto
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Los modelos descargados se guardan en mi carpeta data (que sí persiste)
 ENV HF_HOME=/data/modelos
+
+# Hora de España (sin esto el registro sale en UTC, 1-2 horas por detrás).
+# tzdata ya viene instalado en la imagen base.
+ENV TZ=Europe/Madrid
 
 WORKDIR /data
 CMD ["bash"]
