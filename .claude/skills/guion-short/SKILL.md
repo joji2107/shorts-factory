@@ -54,7 +54,11 @@ Lee [ejemplo-001-pulpo.md](ejemplo-001-pulpo.md): es el tono que hay que imitar.
 - Frases cortas, escritas para decirlas en voz alta: nada de incisos largos,
   paréntesis explicativos, cifras difíciles de pronunciar ni siglas sin explicar.
 - **Negrita** en las palabras con énfasis (una o dos por frase como mucho) y
-  `(pausa)` donde haya que respirar o dejar que el dato se asiente.
+  `(pausa)` donde haya que respirar o dejar que el dato se asiente. La negrita
+  también sale en **amarillo en los subtítulos** (`subtitulos.resaltar_negritas`):
+  márcala en la palabra clave del dato, no en frases enteras, para que el color
+  destaque. Si se cambian las negritas después de grabar, hay que rehacer los
+  subtítulos (`--rehacer subtitulos`).
 
 **Interacción indirecta**: una sola técnica por guion, de estas cinco:
 - pregunta de respuesta fácil ("¿Lo sabías? Dímelo en una palabra")

@@ -116,7 +116,8 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
             transcribir(archivos["voz"], trabajo / "subtitulos.srt",
                         archivos["transcripcion"], config["transcripcion"])
         elif paso == "subtitulos":
-            generar_ass(archivos["transcripcion"], archivos["subtitulos"], config["subtitulos"])
+            generar_ass(archivos["transcripcion"], archivos["subtitulos"], config["subtitulos"],
+                        receta / "guion.md")
         elif paso == "fondo":
             if not edl_manual.exists():
                 crear_edl(archivos["transcripcion"], archivos["voz"], edl, biblioteca, config)

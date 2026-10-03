@@ -11,6 +11,7 @@ y una pregunta que invite a comentar.
 | Parte | Qué se hizo | Commit |
 |---|---|---|
 | 1 | Textos de publicación en la skill `guion-short` y `scripts/creditos.py` | |
+| 2 | Subtítulos con los colores de la marca y resaltado de las negritas del guion | |
 
 ---
 
@@ -84,6 +85,82 @@ Medidas de los dos: descripciones de 1680 y 1495 caracteres (caben en las tres
 plataformas), comentarios de 68 y 61, y en X posts de 200 y 184 y respuestas de 241 y
 249.
 
+## Parte 2: subtítulos con los colores de la marca
+
+### Colores
+Los de la foto de perfil y los banners: azul marino `#14213D` y amarillo `#FFC93C`.
+Están en `config/por_defecto.json`, en formato web, no en el código:
+
+```json
+"color_texto": "#FFFFFF",
+"color_contorno": "#14213D",
+"contorno": 7,
+"resaltar_negritas": true,
+"color_resaltado": "#FFC93C"
+```
+
+ASS escribe los colores al revés que la web: azul, verde, rojo (`&HBBGGRR`). La
+función `color_ass()` de `subtitulos.py` hace el cambio: `#FFC93C` → `3CC9FF` y
+`#14213D` → `3D2114`.
+
+### Contorno: negro o azul
+Contraste calculado con la fórmula WCAG (el mínimo recomendado es 4,5:1):
+
+| Texto | Contorno negro | Contorno azul |
+|---|---|---|
+| Blanco | 21:1 | 16:1 |
+| Amarillo | 13,7:1 | 10,4:1 |
+
+Los dos se leen de sobra. Se compararon fotogramas reales de 002-caballo sobre el
+clip más claro (nieve) y el más oscuro (noche): sobre la nieve, los dos se leen
+igual de bien y el azul se nota como un borde azulado; de noche, el azul separa un
+poco mejor las letras del fondo. Se queda el **azul**: es casi igual de legible y es
+la combinación de la marca (amarillo sobre azul).
+
+### Resaltado de las negritas
+Las palabras que el guion marca en **negrita** salen en amarillo. No basta con buscar
+cada palabra suelta: en 002-caballo hay negritas en palabras que se repiten ("no",
+"todos", "soñar"), y se resaltarían todas. Por eso se **alinea** el guion con la
+transcripción:
+
+1. Del `## Guion` de `guion.md` se sacan las palabras que se dicen (sin las
+   etiquetas `**Gancho:**` ni las `(pausa)`), marcando las que están entre `**`.
+2. Las palabras del guion y las de la transcripción se normalizan: minúsculas, sin
+   tildes (`unicodedata`) y sin signos.
+3. `difflib.SequenceMatcher` busca los tramos iguales en las dos listas. Las palabras
+   de esos tramos que en el guion iban en negrita se escriben como
+   `{\1c&H3CC9FF&}SOÑAR{\r}` (`\1c` cambia el color y `\r` vuelve al del estilo).
+
+Si Whisper escribe alguna palabra de otra manera, solo se pierde esa: el paso dice
+cuántas se han resaltado ("19 de 19 palabras en negrita del guion resaltadas"). Sin
+`guion.md`, o sin negritas (001-pulpo), no se resalta nada.
+
+### Comprobaciones
+- Con contorno negro y sin resaltado, el `.ass` nuevo tiene el mismo `md5` que el
+  anterior: el cambio no altera nada más.
+- `--rehacer subtitulos` de 002-caballo rehízo los subtítulos y el render (y el fondo,
+  que el vigilante había borrado; se repartieron otra vez los cortes al azar, con los
+  mismos 6 clips, así que los créditos no cambian). Duración 44,1 s, -14,65 LUFS.
+- Copias de antes y fotogramas de comparación en `data/pruebas/`.
+
+### Investigación: marcador amarillo detrás de una palabra
+La idea: un bloque amarillo detrás de la palabra, con el texto en azul, como en la
+foto de perfil. Con ASS y FFmpeg (libass 0.17.1 en el contenedor):
+
+- `BorderStyle=3` dibuja una caja opaca, pero detrás de **toda la línea**, no de una
+  palabra.
+- Se puede dibujar un rectángulo con los comandos de dibujo de ASS (`\p1`), pero hay
+  que saber dónde empieza la palabra y cuánto mide en píxeles. Eso exige medir la
+  fuente, y con la biblioteca estándar de Python no se puede.
+- Truco que no necesita medir: duplicar cada línea con resaltado en una capa de
+  debajo con estilo de caja, con todas las palabras transparentes menos la
+  resaltada. Como el texto es idéntico, la caja quedaría justo detrás de la palabra.
+  Hay que **probar** si libass dibuja la caja solo detrás de las letras visibles.
+
+Implicaría el doble de líneas en el `.ass` y cajas rectangulares (sin esquinas
+redondeadas). Azul sobre amarillo se lee muy bien (10,4:1). Decisión: se deja para
+más adelante y, antes de programarlo, se prueba el truco con un fotograma suelto.
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -93,6 +170,9 @@ plataformas), comentarios de 68 y 61, y en X posts de 200 y 184 y respuestas de 
 | Algunas páginas de fuentes no se dejan abrir (Smithsonian, la revista del estudio) | Bloquean las descargas automáticas (error 403) | Comprobar el contenido por el extracto del buscador y anotarlo en la fuente | |
 | La url de un estudio podía cambiar | Las revistas cambian de web | Usar su DOI (`https://doi.org/...`), que siempre lleva al artículo | |
 | Muchas webs decían que Instagram admite 30 hashtags | Páginas de contadores sin actualizar | Buscar el anuncio oficial (5 desde diciembre de 2025) | Fecha de comprobación junto a cada límite |
+| Buscar cada negrita suelta resaltaría todas las veces que sale esa palabra | "no", "todos" o "soñar" se repiten en el guion | Alinear guion y transcripción con `difflib` | |
+| El paso de subtítulos no se entera de que cambian las negritas | Solo depende de la transcripción | `--rehacer subtitulos` | Anotado en la skill |
+| `awk` daba los tiempos de los cortes redondeados | Con el idioma del Mac, `awk` espera coma decimal | `LC_ALL=C awk ...` | |
 | [Añade aquí otros problemas] | | | |
 
 ## Herramientas aprendidas
@@ -103,6 +183,10 @@ plataformas), comentarios de 68 y 61, y en X posts de 200 y 184 y respuestas de 
 | `curl -sI` | Ver solo la respuesta de una web (código y redirección) sin descargarla |
 | `re.split`, `re.findall` | Separar las plataformas de una sección y contar urls y hashtags |
 | `dict.fromkeys` | Quitar repetidos de una lista sin cambiar el orden |
+| `difflib.SequenceMatcher` | Alinear dos listas de palabras parecidas (guion y transcripción) |
+| `unicodedata.normalize("NFD")` | Separar las tildes de las letras para quitarlas |
+| `{\1c&HBBGGRR&}` y `{\r}` en ASS | Cambiar el color de una palabra y volver al estilo |
+| `ffmpeg ... split, hstack, drawtext` | Poner dos versiones de un fotograma lado a lado con su nombre |
 
 ## Mis conclusiones
 - [Añade aquí qué te parece escribir títulos con curiosidad sin caer en el engaño]
@@ -111,4 +195,9 @@ plataformas), comentarios de 68 y 61, y en X posts de 200 y 184 y respuestas de 
 
 ## Pendiente
 - Publicar 001-pulpo y, al día siguiente, 002-caballo.
+- Decidir si se publica el 002-caballo nuevo (colores de la marca, en
+  `data/shorts/002-caballo/final.mp4`) en lugar del de `data/listos/`.
+- Probar el marcador amarillo con un fotograma suelto (parte 2).
+- 001-pulpo no tiene negritas en el guion: si se quieren palabras en amarillo, hay
+  que marcarlas y rehacer sus subtítulos.
 - [Añade aquí otros pendientes]
