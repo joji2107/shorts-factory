@@ -12,8 +12,8 @@ y una pregunta que invite a comentar.
 |---|---|---|
 | 1 | Textos de publicación en la skill `guion-short` y `scripts/creditos.py` | `580af6c` |
 | 2 | Subtítulos con los colores de la marca y resaltado de las negritas del guion | `9a0c07e` |
-| 3 | Hoja para leer el guion (`scripts/para_leer.py`) y short 003-rayo | |
-| 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | |
+| 3 | Hoja para leer el guion (`scripts/para_leer.py`) y short 003-rayo | `73eaf2d` |
+| 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | `73eaf2d` |
 
 ---
 
@@ -239,6 +239,9 @@ de la música ya no empieza nunca antes de la última palabra (aquí, 0,5 s).
 
 Resultado: 37,3 s (0,5 s tras la última palabra), -14,49 LUFS, 2 efectos. La primera
 versión queda en `data/pruebas/003-rayo_v1.mp4`.
+
+En total entraron 23 clips de rayo en el índice (`rayo_01` a `rayo_23`; el mensaje del
+commit `73eaf2d` dice 13 por error).
 
 ## Problemas y soluciones
 
