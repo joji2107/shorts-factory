@@ -11,10 +11,11 @@ Tema pedido: $ARGUMENTS
 Si el argumento es un short que ya existe (`NNN-tema`, con su carpeta en `shorts/`),
 no hay guion que escribir: ve directamente al paso 5 (Publicación) con su `guion.md`.
 
-**Versión de la fábrica**: si la versión por defecto (abajo) es 2.0, o el usuario pide un
-short "2.0" / "de promesa y recompensa", sigue además la sección **Fábrica 2.0**, que
-cambia la estructura del guion, añade marcas de montaje y elige música y protagonistas.
-Si no, la estructura clásica (gancho, dato, giro, remate).
+**Versión de la fábrica**: la versión por defecto (abajo) es la 2.0 desde la fase 10: sigue
+además la sección **Fábrica 2.0**, que cambia la estructura del guion, añade marcas de
+montaje y elige música y protagonistas. Solo si el usuario pide un short "1.0" / "clásico"
+(o la versión por defecto vuelve a ser 1.0), usa la estructura clásica (gancho, dato, giro,
+remate) y escribe `"version_fabrica": "1.0"` en la receta.
 
 Todo en español. Explica al usuario qué vas a hacer en cada paso antes de hacerlo
 (está aprendiendo) y respeta las reglas de CLAUDE.md: no se toca `data/` salvo con
@@ -171,8 +172,9 @@ segundo N, inicio automático)` y una línea `**Planos:**` con cada protagonista
 
 ## 2. Ficha del short
 
-**Duración estimada** = palabras / `palabras_por_segundo` + la cola (`final.cola` de
-`config/por_defecto.json`, ahora 2,5 s, para que la música se apague con su fundido). Es solo
+**Duración estimada** = palabras / `palabras_por_segundo` + los segundos de los `[respiro]`
+(2.0) + la cola (`final.cola` de `config/por_defecto.json`, ahora 2,5 s, para que la música
+se apague con su fundido). Es solo
 una estimación: la duración real la marca la grabación (voz detectada + cola), y
 el vigilante vuelve a comprobar el material con ella.
 
@@ -186,27 +188,44 @@ tema va en singular, minúsculas, sin tildes y con `_` entre palabras
 # NNN-tema: título corto
 
 **Técnica de interacción:** <una de las cinco, con ese nombre exacto>
-**Palabras:** N · **Duración estimada:** X s (velocidad X palabras/s + 2,5 s de cola)
-**Música:** <archivo> · **Efectos:** <archivos y dónde suenan (palabra o automático)>
+**Palabras:** N · **Duración estimada:** X s (velocidad X palabras/s + N s de respiros + 2,5 s de cola)
+**Música:** <archivo> (momento fuerte en el segundo N, inicio automático) · **Efectos:** <archivos y dónde suenan (palabra o automático)>
+**Planos:** <clip> desde N (<qué se ve y en qué frase>) · ...
 
 > <opcional: nota de lectura, si hay algo especial (el final de un bucle, una
 > palabra difícil...). Sale arriba en la hoja para leer.>
 
 ## Guion
-**Gancho:** ...
-**Dato:** ...
-**Giro:** ...
-**Remate:** ...
+**Promesa:** ...
+**Escalones:** ... [respiro 2] [plano <clip> <desde> <largo>] ...
+**Revelación:** [respiro 3] [plano <clip> <desde> <largo>] ...
+**Cierre:** ...
 
 ## Fuentes
 1. <dato>: <fuente> (<url>)
 ```
 
+En un short 1.0 (clásico), las etiquetas son **Gancho**, **Dato**, **Giro** y **Remate**, sin
+marcas ni línea de `**Planos:**`, y la música sin momento fuerte.
+
 **config.json**: solo lo que cambia respecto a la plantilla (el vigilante la pone
 debajo al llegar la grabación). Sin `audio_original` (eso marca la receta como
 reservada) y sin `clips` (los elige el vigilante con la duración real). Siempre con
-`version_fabrica` (`"1.0"` o `"2.0"`): fija con qué valores se hace el short aunque luego
-cambie la versión por defecto.
+`version_fabrica` (`"2.0"` o `"1.0"`): fija con qué valores se hace el short aunque luego
+cambie la versión por defecto. La 2.0 ya activa respiros, ritmo y música automática:
+
+```json
+{
+  "version_fabrica": "2.0",
+  "musica": {"archivo": "data/biblioteca/musica/<archivo>.mp3"},
+  "efectos": {"lista": [
+    {"archivo": "data/biblioteca/sfx/<a>.mp3", "palabra": "<palabra>"},
+    {"archivo": "data/biblioteca/sfx/<b>.mp3", "palabra": "<palabra>"}
+  ]}
+}
+```
+
+En un short 1.0 (clásico), los efectos pueden ir automáticos:
 
 ```json
 {

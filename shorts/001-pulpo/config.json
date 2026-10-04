@@ -1,4 +1,5 @@
 {
+  "version_fabrica": "1.0",
   "audio_original": "data/entrada/voz_prueba.wav",
   "voz": {
     "inicio": 5

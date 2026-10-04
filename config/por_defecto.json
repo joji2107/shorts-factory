@@ -1,5 +1,5 @@
 {
-  "version_fabrica": "1.0",
+  "version_fabrica": "2.0",
   "voz": {
     "inicio": 0,
     "quitar_ruidos": {"umbral": "-35dB", "duracion_max": 0.15, "hueco_min": 0.2, "margen": 0.15},

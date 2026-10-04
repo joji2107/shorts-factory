@@ -1,4 +1,5 @@
 {
+  "version_fabrica": "1.0",
   "voz": {
     "inicio": "auto",
     "umbral_silencio": "-40dB",

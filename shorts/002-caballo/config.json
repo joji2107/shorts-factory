@@ -1,4 +1,5 @@
 {
+  "version_fabrica": "1.0",
   "musica": {
     "archivo": "data/biblioteca/musica/alegria_03.mp3"
   },

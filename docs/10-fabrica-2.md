@@ -15,7 +15,8 @@ receta, para que los shorts anteriores se sigan reproduciendo igual.
 | 2 | Marcas del guion (`marcas.py`) y paso `respiros` | `a62f00f` |
 | 3 | Ritmo variable y planos protagonistas (`cortes.py`, `material.py`) | `66f357d` |
 | 4 | Música con energía: `musica.json`, inicio automático y subida en los respiros | `5cb861f` |
-| 5 | Skill `guion-short` (sección Fábrica 2.0), `hoja_fotogramas.py` y `evaluar_material` con versión | |
+| 5 | Skill `guion-short` (sección Fábrica 2.0), `hoja_fotogramas.py` y `evaluar_material` con versión | `9e31343` |
+| 6 | Prueba completa (011-volcan) y 2.0 como versión por defecto | |
 
 ---
 
@@ -187,12 +188,40 @@ de 5 dB; 5 tienen subidas suaves (3-4,4 dB) y 4 son planas.
   enlaza con la promesa, 90-110 palabras, las marcas `[respiro]` y `[plano]`, cómo elegir
   protagonistas y música (no plana, subida de 5 dB o más, momento fuerte después de la
   revelación y ningún respiro en un valle). Al cargarse lee la versión por defecto y la
-  tabla de energía de `musica.json`. Todas las recetas llevan ya `version_fabrica`.
+  tabla de energía de `musica.json`, y escribe `version_fabrica` en las recetas nuevas (las
+  antiguas la recibieron en la parte 6, con `promover_version.py`).
 - **`scripts/hoja_fotogramas.py <clips o tema>`**: un fotograma por segundo en mosaico,
   con el segundo escrito, en `data/cache/fotogramas/<clip>.jpg`. Sirve para elegir el
   clip y el `desde` de cada plano mirando qué pasa en cada momento.
 - **`evaluar_material(..., version="2.0")`**: simula el reparto con los cortes de relleno
   (1-2,2 s en vez de 1,5-4 s). Como duración se le pasa voz + respiros − planos.
+
+## Parte 6: prueba completa y la 2.0 por defecto
+
+- **Prueba completa: 011-volcan**, el primer short 2.0 con material real (8 clips de la
+  erupción de La Palma de 2021 y una costa de lava). Tres planos protagonistas, dos respiros
+  (2 s y 3 s) y `alegria_03` empezando en su segundo 93,6 para que su momento fuerte (120 s)
+  caiga en la revelación. Salió en 2,4 min y sin errores: 45,2 s.
+- **Promoción**: `promover_version.py 2.0` fijó a la `1.0` las 11 recetas que no decían
+  versión (001-010 y 900), creó el `config.json` de 901-prueba_voz (solo tenía el guion) y
+  cambió la versión por defecto a `2.0`. La segunda ejecución dice «Nada que cambiar».
+- **Skill**: la 2.0 es lo normal (plantillas de `guion.md` y `config.json` de la 2.0); la
+  estructura clásica solo si se pide un short 1.0.
+
+**Comprobación sin regresiones** (004-elefante). Rehacer el paso `fondo` no sirve para
+comparar: vuelve a generar `cortes_auto.txt`, que tiene azar (`desplazar()` y el reparto
+entre clips empatados), y además sobrescribe los archivos de un short publicado. Así que se
+comparó, en una carpeta aparte, antes y después de promover:
+
+| Qué | Antes | Después |
+|---|---|---|
+| `cargar_config()` fusionada | `8ba809f5…` | `8ba809f5…` |
+| `crear_edl()` con `random.seed(2026)` | `0228c49c…` | `0228c49c…` |
+| `fondo.mp4` con su `cortes_auto.txt` real | `d9c21707…` | `d9c21707…` |
+
+El «antes» se ejecutó dos veces para comprobar que la prueba es repetible. Sin la línea
+`"version_fabrica": "1.0"`, 004 heredaría la 2.0 (respiros, ritmo y música automática):
+esa línea es lo que lo mantiene igual.
 
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]
