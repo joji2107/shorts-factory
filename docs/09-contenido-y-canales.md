@@ -15,7 +15,8 @@ y una pregunta que invite a comentar.
 | 3 | Hoja para leer el guion (`scripts/para_leer.py`) y short 003-rayo | `73eaf2d` |
 | 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | `73eaf2d` |
 | 5 | Short 004-elefante (estudio original) y final del vídeo tras la última palabra | |
-| 8 | Publicaciones y métricas: CSV, scripts, skill `registrar-metricas` y avisos en el servidor | |
+| 8 | Publicaciones y métricas: CSV, scripts, skill `registrar-metricas` y avisos en el servidor | `ac708a3` |
+| 9 | Shorts 007-cambio_hora y 008-orionidas: temas de actualidad, cifras mezcladas en negrita y la estrella fugaz animada | |
 
 ---
 
@@ -399,6 +400,46 @@ y el análisis con 6 shorts en YouTube y 3 en TikTok (salen todos los avisos). C
 datos reales: ninguna medida pendiente hoy; la primera es 001-pulpo a las 48 h, el
 2026-10-05 a las 13:45.
 
+## Parte 9: 007-cambio_hora y 008-orionidas
+
+### Temas de actualidad
+Se buscaron en noticias del 2026-10-04 temas que se comentan ahora, sin animales,
+con material de fondo genérico, sin política ni personas o marcas reconocibles y con
+un dato que aguante semanas. De tres propuestas (el mito del cambio de hora, el «fin
+del mundo» del 13 de noviembre de 2026 y las Oriónidas) se hicieron dos:
+
+- **007-cambio_hora**: el cambio de hora no se inventó para los agricultores, que fueron
+  sus mayores enemigos. Primera vez con *pregunta de respuesta fácil*, `error_02` y
+  `ding_02`. 8 clips verticales y reales (relojes, vacas, campo, atardeceres).
+- **008-orionidas**: cada estrella fugaz de octubre es polvo del cometa Halley. Bucle.
+  En vertical solo había 3 cielos reales; el resto son 4 horizontales reales y una
+  estrella fugaz **animada** (`orionidas_04`, etiqueta descriptiva nueva `animacion`),
+  1 de 8 clips. La receta fija los 8 clips para que el vigilante no la deje fuera.
+
+### Erratas en el nombre de la grabación
+`007-camnio_hora.wav` y `008-oriondas.wav` acabaron en `data/errores/` («No hay vídeos
+con la etiqueta...»). No llegaron a crear nada: bastó con devolverlos a la bandeja con
+el nombre bien escrito.
+
+### «Doscientos mil» sin resaltar
+Whisper escribió «más de 200.000 km por hora» donde el guion dice «más de **doscientos
+mil** kilómetros por hora». El tramo distinto mezcla negrita (el número) y texto normal
+(«kilómetros» → «km»), y solo se resaltaban los tramos distintos enteros en negrita.
+Ahora, si las negritas del tramo son un número escrito con letras y el resto no,
+se resaltan las palabras transcritas con cifras. Comprobado con los 8 shorts: los
+subtítulos de 001 a 007 salen idénticos byte a byte y solo cambia el 008.
+
+### La estrella fugaz animada no se veía
+La animación solo enseña la estrella cruzando en los segundos 1, 9-10, 23, 38 y 48,
+menos de un segundo cada vez (hoja `data/pruebas/orionidas_04_segundos.png`). El
+reparto automático la puso en 40,6-43,6 s y 44,1-47,9 s: dos planos de estrellas
+quietas. Se convirtió el reparto en un `cortes.txt` manual moviendo solo esos dos cortes
+(22,6 s y 37,6 s, medio segundo antes de cada estrella) y se rehízo. En el vídeo final
+la estrella cruza dos veces, la primera justo en «entran en el aire a más de doscientos
+mil kilómetros por hora». La primera versión queda en `data/pruebas/008-orionidas_v1.mp4`.
+Lección: un clip que solo muestra el tema unos instantes hay que mirarlo segundo a
+segundo antes de dejar el reparto al azar.
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -414,6 +455,8 @@ datos reales: ninguna medida pendiente hoy; la primera es 001-pulpo a las 48 h, 
 | Con 6 clips de rayo, `evaluar_material` decía "justo" y pedía uno más (003-rayo) | La skill le pasaba la duración estimada (con la cola) y la herramienta vuelve a sumar la cola: 47 s en vez de 44,4 | Pasarle la duración de la voz (palabras / velocidad); con 41,9 s, "suficiente" | Skill, docstring de la herramienta y `CLAUDE.md` dicen que es sin la cola |
 | `buscar_clips` descargó clips sin rayo o hechos con IA | Se quedaba con los primeros resultados de Pixabay, que mezcla vídeos parecidos, y priorizaba los verticales | Palabra clave en las etiquetas, primero los que no son IA, `ver_candidatos` con miniaturas y descarga por `ids` | Mirar las miniaturas antes de descargar: lo que entra en la biblioteca no se borra |
 | El próximo short de rayos habría elegido los 15 clips que no sirven | Seguían en el índice sin marca y `elegir_clips` empieza por los menos usados | Etiqueta `descartado`, que `clips_del_tema()` excluye; `ia` en `rayo_05` | Al descargar un clip que luego no sirve, descartarlo en el índice en el momento |
+| «Doscientos mil» no salía en amarillo (008) | El tramo distinto mezclaba el número en negrita con «kilómetros» → «km» | Resaltar las palabras con cifras si las negritas del tramo son un número | |
+| La estrella fugaz animada no aparecía en el vídeo (008) | Solo cruza en 5 instantes de 58 s y el reparto la cortó entre dos | `cortes.txt` manual con esos cortes medio segundo antes de una estrella | Mirar segundo a segundo los clips con un instante clave |
 | Cortes de tormenta en negro | En lo grabado de verdad, el rayo dura un instante | `video.buscar_destellos`: cada corte empieza antes de un destello | La skill lo pide para temas de un instante |
 | El efecto de error sonaba tarde | `error_01.mp3` empieza con 0,6 s de silencio | Restar el silencio inicial al anclar a una palabra | Medir los efectos nuevos con `silencedetect` |
 | El bucle no enlazaba | El vídeo acababa casi 3 s después de la última palabra | `final.tras_ultima_palabra` y fundido de la música que no empieza antes de la última palabra | La skill lo pone en los guiones con bucle |

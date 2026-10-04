@@ -18,6 +18,10 @@ import unicodedata
 
 FIN_FRASE = (".", "?", "!", ",", ";", ":")
 PARECIDO_MIN = 0.5      # parecido mínimo (de 0 a 1) para corregir un tramo con el guion
+# Palabras de un número escrito con letras, ya normalizadas (sin tildes): Whisper los escribe con cifras
+NUMERO = re.compile(r"\d+|cero|uno?|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|"
+                    r"trece|catorce|quince|dieci\w+|veint\w*|treinta|cuarenta|cincuenta|sesenta|"
+                    r"setenta|ochenta|noventa|cien|ciento|\w*cientos|quinientos|mil|millon|millones")
 
 
 def color_ass(web):
@@ -113,7 +117,24 @@ def indices_resaltados(palabras, guion):
             # Whisper lo ha escrito de otra manera ("treinta mil" -> "30.000"): si en el
             # guion todo el tramo va en negrita, se resalta lo transcrito en su lugar
             resaltados.update(i for i, _ in transcritas[b1:b2])
+        elif operacion == "replace" and cifra_en_negrita(guion[a1:a2]):
+            # Tramo mezclado: "doscientos mil kilómetros" -> "200.000 km". La negrita es
+            # el número, así que se resalta lo transcrito con cifras ("200.000"), no "km"
+            resaltados.update(i for i, limpia in transcritas[b1:b2] if any(c.isdigit() for c in limpia))
     return resaltados, sum(g[1] for g in guion)
+
+
+def es_numero(normalizada):
+    """'doscientos', 'mil', 'veintiuno', '2061'... (sin tildes, en minúsculas)."""
+    return bool(NUMERO.fullmatch(normalizada))
+
+
+def cifra_en_negrita(tramo):
+    """Si en un tramo del guion las palabras en negrita son un número escrito con letras
+    (o con cifras) y las demás no lo son."""
+    negritas = [g[0] for g in tramo if g[1]]
+    resto = [g[0] for g in tramo if not g[1]]
+    return bool(negritas) and all(es_numero(p) for p in negritas) and not any(es_numero(p) for p in resto)
 
 
 def unir_cifras(palabras):

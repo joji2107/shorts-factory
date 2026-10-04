@@ -1,8 +1,18 @@
 {
+  "voz": {
+    "inicio": "auto",
+    "umbral_silencio": "-40dB",
+    "margen_inicio": 0.15
+  },
   "musica": {
     "archivo": "data/biblioteca/musica/misterio_02.mp3"
   },
   "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ],
     "lista": [
       {
         "archivo": "data/biblioteca/sfx/riser_02.mp3",
@@ -29,5 +39,6 @@
       "orionidas_07",
       "orionidas_08"
     ]
-  }
+  },
+  "audio_original": "data/archivo/008-orionidas.wav"
 }

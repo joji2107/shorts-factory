@@ -204,6 +204,11 @@ palabra (en vez de 2,5 s de cola) y la música se funde en ese medio segundo.
      artificiales), pon `"video": {"buscar_destellos": true}` en `config.json`:
      cada corte empieza justo antes de un destello. Si no, en un clip de tormenta
      de 50 s casi todos los cortes caen en negro.
+   - Si un clip solo enseña el tema unos instantes y no es un destello de luz (la
+     estrella fugaz animada de 008-orionidas cruza 5 veces en 58 s), míralo segundo a
+     segundo (un fotograma por segundo en una hoja) y, tras el render, fija sus cortes
+     en un `cortes.txt` medio segundo antes de cada momento: el reparto al azar los
+     puede cortar entre dos.
 3. Vuelve a ejecutar `evaluar_material` para confirmar. Si sigue sin llegar (no hay
    más vídeos en Pixabay, por ejemplo), dilo: el short se puede hacer, pero
    repetirá planos.

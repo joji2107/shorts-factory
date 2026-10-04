@@ -31,7 +31,14 @@ Fuentes:
 - History.com: https://www.history.com/articles/8-things-you-may-not-know-about-daylight-saving-time
 
 Créditos:
-(pendientes: se rellenan con creditos.py)
+Vídeo: JACLOU-DL en Pixabay, https://pixabay.com/videos/id-202770/
+Vídeo: Matthias_Groeneveld en Pixabay, https://pixabay.com/videos/id-298090/
+Vídeo: Matthias_Groeneveld en Pixabay, https://pixabay.com/videos/id-154300/
+Vídeo: Matthias_Groeneveld en Pixabay, https://pixabay.com/videos/id-298098/
+Vídeo: Matthias_Groeneveld en Pixabay, https://pixabay.com/videos/id-230247/
+Vídeo: Matthias_Groeneveld en Pixabay, https://pixabay.com/videos/id-199112/
+Música: DesiFreeMusic en Pixabay, https://pixabay.com/music/bloopers-fail-sound-comedy-reaction-309057/
+Efectos de sonido: freesound_community y Liecio (Pixabay)
 
 #cambiodehora #curiosidades #historia #mitos
 ```
@@ -48,5 +55,5 @@ El 25 de octubre retrasamos el reloj una hora. ¿Lo agradeces o te descoloca tod
 ### Respuesta
 ```text
 Fuentes: https://www.loc.gov/exhibitions/world-war-i-american-experiences/about-this-exhibition/over-here/home-front-contributions/daylight-saving-time/ https://www.farmprogress.com/farm-life/saving-daylight-didn-t-start-with-farmers https://www.history.com/articles/8-things-you-may-not-know-about-daylight-saving-time
-Créditos: (pendientes)
+Créditos: vídeos de JACLOU-DL y Matthias_Groeneveld (Pixabay); música de DesiFreeMusic (Pixabay); efectos de Pixabay.
 ```

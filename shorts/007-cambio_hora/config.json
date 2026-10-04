@@ -1,10 +1,42 @@
 {
-  "musica": {"archivo": "data/biblioteca/musica/alegria_02.mp3"},
+  "voz": {
+    "inicio": "auto",
+    "umbral_silencio": "-40dB",
+    "margen_inicio": 0.15
+  },
+  "musica": {
+    "archivo": "data/biblioteca/musica/alegria_02.mp3"
+  },
   "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ],
     "lista": [
-      {"archivo": "data/biblioteca/sfx/error_02.mp3", "palabra": "agricultores"},
-      {"archivo": "data/biblioteca/sfx/ding_02.mp3", "palabra": "carbón"},
-      {"archivo": "data/biblioteca/sfx/whoosh_02.mp3", "palabra": "curioso"}
+      {
+        "archivo": "data/biblioteca/sfx/error_02.mp3",
+        "palabra": "agricultores"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/ding_02.mp3",
+        "palabra": "carbón"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/whoosh_02.mp3",
+        "palabra": "curioso"
+      }
+    ]
+  },
+  "audio_original": "data/archivo/007-cambio_hora.wav",
+  "video": {
+    "clips": [
+      "cambio_hora_06",
+      "cambio_hora_08",
+      "cambio_hora_03",
+      "cambio_hora_07",
+      "cambio_hora_04",
+      "cambio_hora_01"
     ]
   }
 }
