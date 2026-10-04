@@ -12,9 +12,9 @@
 
 **Gancho:** Un trocito del **cometa Halley**, ardiendo en el cielo. (pausa)
 
-**Dato:** Cada octubre, la Tierra cruza el polvo que ha ido soltando el Halley. Son granos **diminutos**, como granos de arena. Y entran en el aire a más de **doscientos mil** kilómetros por hora. (pausa) A esa velocidad arden en un instante: eso es una **estrella fugaz**. Se llaman Oriónidas, porque parecen salir de la constelación de Orión, y su mejor noche es la del veintiuno de octubre.
+**Dato:** Cada octubre, la Tierra cruza el polvo que ha ido soltando el Halley. Son granos **diminutos**, como granos de arena. Y entran en el aire a más de **doscientos mil** kilómetros por hora. (pausa) [plano orionidas_06 10 6] A esa velocidad arden en un instante: eso es una **estrella fugaz**. Se llaman Oriónidas, porque parecen salir de la constelación de Orión, y su mejor noche es la del veintiuno de octubre.
 
-**Giro:** [respiro 3] Y todavía hay más. (pausa) El cometa no volverá hasta **2061**… pero su polvo nos visita **dos veces** al año: ahora, y otra vez en mayo.
+**Giro:** [respiro 3] [plano orionidas_04 30 7] Y todavía hay más. (pausa) El cometa no volverá hasta **2061**… pero su polvo nos visita **dos veces** al año: ahora, y otra vez en mayo.
 
 **Remate:** Así que, si este mes ves una estrella fugaz, pide un deseo… [respiro] y recuerda que lo que estás viendo es
 

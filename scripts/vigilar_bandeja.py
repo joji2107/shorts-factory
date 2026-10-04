@@ -22,6 +22,7 @@ from pathlib import Path
 
 import lectura
 import material
+from pasos.marcas import planos_del_guion
 from crear_short import RAIZ, config_base, crear, fusionar
 
 DATA = RAIZ / "data"
@@ -119,8 +120,19 @@ def material_despues_de_voz(nombre):
             return                               # cortes a mano: no hay nada que elegir
         tema = nombre.split("-", 1)[-1]
         clips = config["video"]["clips"]
+        # Con ritmo (fábrica 2.0), los planos protagonistas del guion ya tienen su clip:
+        # los clips de la receta son el relleno del resto del tiempo
+        protagonistas = []
+        if config["video"]["ritmo"]["activo"]:
+            planos = planos_del_guion(receta / "guion.md")
+            protagonistas = sorted({clip for _, clip, _, _, _ in planos})
+            total = max(0.0, total - sum(largo for _, _, _, largo, _ in planos))
+            if planos:
+                registrar(f"       {len(planos)} planos protagonistas ({', '.join(protagonistas)}): "
+                          f"quedan {total:.1f} s de relleno")
+            clips = [clip for clip in clips if clip not in protagonistas]
         if not clips:
-            clips, estado = material.elegir_clips(tema, total, config)
+            clips, estado = material.elegir_clips(tema, total, config, protagonistas=protagonistas)
             config["video"]["clips"] = clips
             ruta = receta / "config.json"
             propia = json.loads(ruta.read_text(encoding="utf-8"))

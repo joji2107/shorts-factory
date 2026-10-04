@@ -42,7 +42,10 @@
       "orionidas_06",
       "orionidas_07",
       "orionidas_08"
-    ]
+    ],
+    "ritmo": {
+      "activo": true
+    }
   },
   "audio_original": "data/archivo/008-orionidas.wav"
 }

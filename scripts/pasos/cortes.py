@@ -21,16 +21,27 @@ Versión 5:
   oscuro y, con un punto al azar, muchos cortes salían sin rayo.
 - Los cortes llegan hasta la cola después de la última palabra (o tras_ultima_palabra
   en un bucle), como el render: no al final de la grabación.
+
+Versión 6 (fábrica 2.0, con video.ritmo.activo):
+- Los planos protagonistas del guion ([plano clip desde largo]) van primero, en su sitio:
+  empiezan justo antes de su palabra (o con el respiro que los precede), desde el segundo
+  del clip que eligió la skill, y pueden durar más que corte_max (hasta plano_max).
+- Un respiro sin protagonista es un tramo de un solo plano: nada de cortes rápidos en silencio.
+- El resto es relleno: cortes rápidos (relleno_min-relleno_max) con los demás clips. El
+  contraste entre los cortes rápidos y los planos largos es lo que da ritmo.
 """
 import json
 import random
 import re
 import statistics
 
+from .marcas import en_la_transcripcion, planos_del_guion
+from .subtitulos import palabras_del_guion
 from .utilidades import duracion, ejecutar
 
 FPS = 30
 MARGEN = 0.5        # segundos que se saltan entre dos usos de un clip, para no repetir plano
+ANTICIPO = 0.1     # segundos que un plano protagonista empieza antes de su palabra
 FIN_FRASE = (".", "?", "!")
 PAUSA_SUAVE = (",", ";", ":")
 
@@ -61,10 +72,10 @@ def huecos(palabras, c):
     return pausas, fronteras
 
 
-def puntos_de_corte(palabras, total, c):
-    """Elige los momentos de corte tramo a tramo."""
+def puntos_de_corte(palabras, total, c, desde=0.0):
+    """Elige los momentos de corte tramo a tramo, de 'desde' a 'total'."""
     pausas, fronteras = huecos(palabras, c)
-    puntos = [0.0]
+    puntos = [desde]
     while total - puntos[-1] > c["corte_max"]:
         ultimo = puntos[-1]
         desde = ultimo + c["corte_min"]
@@ -194,7 +205,104 @@ def a_destellos(edl, biblioteca, duraciones, antes=0.4):
     return resultado
 
 
-def crear_edl(json_palabras, voz, salida, biblioteca, config):
+def tramos_fijos(palabras, guion, respiros, total, c, duracion_de):
+    """Los tramos que no se cortan: planos protagonistas y respiros sin protagonista.
+    Devuelve [(inicio, fin, clip o None, desde, descripción)] ordenados; clip None es un
+    respiro, que se rellena con un solo plano de relleno. Lanza RuntimeError con la marca
+    culpable si un plano se sale del clip, es demasiado largo o se pisa con otro tramo."""
+    planos = planos_del_guion(guion) if guion is not None else []
+    fijos = []
+    if planos:
+        indices = en_la_transcripcion([p[0] for p in planos], palabras, palabras_del_guion(guion))
+        for (_, clip, desde, largo, contexto), i in zip(planos, indices):
+            marca = f"[plano {clip} {desde:g} {largo:g}] antes de «{contexto}»"
+            if i is None or i >= len(palabras):
+                raise RuntimeError(f"{marca}: no se encuentra en la transcripción (o está al final)")
+            if largo > c["ritmo"]["plano_max"]:
+                raise RuntimeError(f"{marca}: dura más que video.ritmo.plano_max ({c['ritmo']['plano_max']:g} s)")
+            if desde + largo > duracion_de(clip):
+                raise RuntimeError(f"{marca}: se sale del clip, que dura {duracion_de(clip):.1f} s")
+            inicio = max(0.0, palabras[i]["inicio"] - ANTICIPO)
+            for r in respiros:
+                # Si la palabra viene justo después de un respiro, el plano empieza con el respiro
+                if (i == 0 or r["inicio"] >= palabras[i - 1]["fin"] - 0.01) and r["fin"] <= palabras[i]["inicio"] + 0.01:
+                    inicio = r["inicio"]
+            fijos.append((a_fotograma(inicio), a_fotograma(min(inicio + largo, total)), clip, desde, marca))
+    for r in respiros:
+        cubierto = any(ini <= r["inicio"] + 0.05 and fin >= r["fin"] - 0.05 for ini, fin, *_ in fijos)
+        if not cubierto:
+            fijos.append((a_fotograma(r["inicio"]), a_fotograma(r["fin"]), None, 0.0,
+                          f"[respiro] antes de «{r['antes_de']}»"))
+    fijos.sort()
+    for anterior, siguiente in zip(fijos, fijos[1:]):
+        if siguiente[0] < anterior[1] - 0.001:
+            raise RuntimeError(f"Se pisan {anterior[4]} y {siguiente[4]}: acorta el primero o aleja las marcas")
+    return fijos
+
+
+def segmentos_con_ritmo(palabras, total, fijos, c, duracion_de):
+    """Toda la duración en tramos: los fijos y, entre ellos, cortes de relleno rápidos.
+    Devuelve [(inicio, fin, clip o None, desde)]; clip None se reparte con el relleno.
+    Un hueco más corto que relleno_min no se convierte en un fogonazo: alarga el tramo
+    anterior (si es un plano, solo si al clip le queda material)."""
+    ritmo = c["ritmo"]
+    relleno = {**c, "corte_min": ritmo["relleno_min"], "corte_max": ritmo["relleno_max"]}
+    segmentos, t = [], 0.0
+    for inicio, fin, clip, desde, _ in fijos + [(total, total, None, 0.0, "")]:
+        if inicio - t > 0.001:
+            anterior = segmentos[-1] if segmentos else None
+            cabe = anterior and (anterior[2] is None or
+                                 anterior[3] + (inicio - anterior[0]) <= duracion_de(anterior[2]))
+            if inicio - t < ritmo["relleno_min"] and cabe:
+                segmentos[-1] = (anterior[0], inicio, anterior[2], anterior[3])
+            else:
+                puntos = puntos_de_corte(palabras, inicio, relleno, desde=t)
+                segmentos += [(a, b, None, 0.0) for a, b in zip(puntos, puntos[1:])]
+        if fin > inicio:
+            segmentos.append((inicio, fin, clip, desde))
+        t = max(t, fin)
+    return segmentos
+
+
+def edl_con_ritmo(palabras, total, guion, respiros, biblioteca, c):
+    """Lista de cortes de la fábrica 2.0: protagonistas fijos + relleno rápido."""
+    duraciones = {}
+
+    def duracion_de(clip):
+        if clip not in duraciones:
+            ruta = biblioteca / f"{clip}.mp4"
+            if not ruta.exists():
+                raise RuntimeError(f"El clip {clip} no está en data/biblioteca/video")
+            duraciones[clip] = duracion(ruta)
+        return duraciones[clip]
+
+    fijos = tramos_fijos(palabras, guion, respiros, total, c, duracion_de)
+    segmentos = segmentos_con_ritmo(palabras, total, fijos, c, duracion_de)
+    protagonistas = {clip for _, _, clip, _, _ in fijos if clip}
+    relleno = [clip for clip in c["clips"] if clip not in protagonistas] or c["clips"]
+    for clip in relleno:
+        duracion_de(clip)
+    largos = [fin - inicio for inicio, fin, clip, _ in segmentos if clip is None]
+    edl_relleno, avisos = repartir(largos, relleno, duraciones)
+    for aviso in avisos:
+        print(f"   AVISO: {aviso}")
+    edl_relleno = desplazar(edl_relleno, duraciones)
+    if c.get("buscar_destellos"):
+        edl_relleno = a_destellos(edl_relleno, biblioteca, duraciones)
+
+    edl, siguiente = [], iter(edl_relleno)
+    for inicio, fin, clip, desde in segmentos:
+        edl.append(next(siguiente) if clip is None else (clip, desde, fin - inicio))
+    for inicio, fin, clip, desde, descripcion in fijos:
+        print(f"   {inicio:6.2f}-{fin:6.2f} s: " + (f"{clip} desde {desde:g} s, por {descripcion}"
+                                                     if clip else f"un solo plano, {descripcion}"))
+    if largos:
+        print(f"   {len(largos)} cortes de relleno, de {min(largos):.1f} a {max(largos):.1f} s")
+    return edl
+
+
+def crear_edl(json_palabras, voz, salida, biblioteca, config, guion=None, respiros=()):
+    """guion (guion.md) y respiros (los de respiros.json) solo se usan con video.ritmo.activo."""
     c = config["video"]
     if not c["clips"]:
         raise RuntimeError("No hay cortes.txt en la receta ni lista de 'clips' en la configuración")
@@ -204,11 +312,14 @@ def crear_edl(json_palabras, voz, salida, biblioteca, config):
         total = palabras[-1]["fin"] + (tras if tras is not None else config["final"]["cola"])
     else:
         total = duracion(voz) + config["final"]["cola"]
-    puntos = puntos_de_corte(palabras, total, c)
-    edl = asignar_clips(puntos, c["clips"], biblioteca)
-    if c.get("buscar_destellos"):
-        duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in c["clips"]}
-        edl = a_destellos(edl, biblioteca, duraciones)
+    if c["ritmo"]["activo"]:
+        edl = edl_con_ritmo(palabras, total, guion, list(respiros), biblioteca, c)
+    else:
+        puntos = puntos_de_corte(palabras, total, c)
+        edl = asignar_clips(puntos, c["clips"], biblioteca)
+        if c.get("buscar_destellos"):
+            duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in c["clips"]}
+            edl = a_destellos(edl, biblioteca, duraciones)
     salida.write_text(
         "".join(f"{clip} {inicio:.3f} {largo:.4f}\n" for clip, inicio, largo in edl),
         encoding="utf-8",

@@ -98,8 +98,14 @@ def duraciones(clips):
 
 
 def escenarios(total, video):
-    """Tres maneras de cortar el short: todo con cortes mínimos, medios o máximos."""
-    minimo, maximo = video["corte_min"], video["corte_max"]
+    """Tres maneras de cortar el short: todo con cortes mínimos, medios o máximos.
+    Con ritmo (fábrica 2.0), lo que se reparte es el relleno, con sus cortes rápidos;
+    'total' es entonces lo que no cubren los planos protagonistas."""
+    ritmo = video.get("ritmo", {})
+    if ritmo.get("activo"):
+        minimo, maximo = ritmo["relleno_min"], ritmo["relleno_max"]
+    else:
+        minimo, maximo = video["corte_min"], video["corte_max"]
     numeros = {
         "cortes cortos": int(total // minimo),                       # cada corte >= corte_min
         "cortes medios": max(1, round(total / ((minimo + maximo) / 2))),
@@ -135,12 +141,13 @@ def clips_que_faltan(durs, total, video):
     return None, tipica
 
 
-def elegir_clips(tema, total, config, azar=random):
+def elegir_clips(tema, total, config, azar=random, protagonistas=()):
     """Los clips justos para el short: primero los que no son IA (un short hecho solo
     con clips de IA queda pobre) y, entre ellos, los menos usados (al azar entre los
-    empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos."""
+    empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos.
+    Los protagonistas (fábrica 2.0) no son relleno: no se eligen aquí."""
     filas = leer_indice()
-    candidatos = clips_del_tema(tema, filas)
+    candidatos = [clip for clip in clips_del_tema(tema, filas) if clip not in protagonistas]
     if not candidatos:
         return [], "insuficiente"
     shorts, cortes = usos()

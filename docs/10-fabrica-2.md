@@ -12,7 +12,8 @@ receta, para que los shorts anteriores se sigan reproduciendo igual.
 | Parte | Qué se hizo | Commit |
 |---|---|---|
 | 1 | Versiones de la fábrica: `config/versiones/`, `promover_version.py`, versión en métricas | `ef0d3e4` |
-| 2 | Marcas del guion (`marcas.py`) y paso `respiros` | |
+| 2 | Marcas del guion (`marcas.py`) y paso `respiros` | `a62f00f` |
+| 3 | Ritmo variable y planos protagonistas (`cortes.py`, `material.py`) | |
 
 ---
 
@@ -92,6 +93,39 @@ usan `voz.wav` y `palabras.json` como siempre. Si se cambia un `[respiro]` del g
 - Short de prueba 902-respiros (la voz de 008 con `[respiro 3]` y `[respiro]`): la voz
   tiene exactamente 264 000 muestras más (5,5 s a 48 kHz), los huecos miden −91 dB,
   «Y TODAVÍA HAY» pasa de 22,04 s a 25,04 s y el efecto anclado a «más», de 22,8 s a 25,8 s.
+
+---
+
+## Parte 3: ritmo variable y planos protagonistas
+
+### Qué hace
+Con `video.ritmo.activo` (versión 2.0), `cortes.py` monta la lista de cortes en tres pasos:
+
+1. **Tramos fijos.** Cada `[plano clip desde largo]` empieza 0,1 s antes de su palabra
+   (o con el respiro que tiene justo delante) y dura `largo` aunque pase de `corte_max`
+   (hasta `plano_max`, 9 s). Cada respiro sin protagonista es un tramo de un solo plano.
+2. **Relleno.** Los huecos entre tramos fijos se cortan con el mismo `puntos_de_corte()`
+   de siempre, pero entre `relleno_min` y `relleno_max` (1-2,2 s). Un hueco más corto que
+   `relleno_min` alarga el tramo anterior en vez de dejar un fogonazo.
+3. **Reparto.** `repartir()` reparte solo el relleno, con los clips de la receta menos los
+   protagonistas; los protagonistas no pasan por `desplazar()`, porque su segundo de
+   inicio lo eligió la skill mirando los fotogramas.
+
+El contraste entre los cortes rápidos y los planos largos es lo que da ritmo.
+
+Los errores dicen qué marca falla: un plano que se sale del clip, que dura más que
+`plano_max` o que se pisa con otro tramo.
+
+El vigilante descuenta el tiempo de los planos y elige el relleno sin los protagonistas;
+`material.py` simula el reparto con los cortes de relleno.
+
+### Comprobación
+- Listas de cortes de los 9 shorts con clips automáticos, generadas con el `cortes.py` de
+  antes y el de ahora con la misma semilla de azar: idénticas.
+- 902-respiros con `[plano orionidas_06 10 6]` y `[plano orionidas_04 30 7]` tras el
+  `[respiro 3]`: el primero va de 11,63 a 17,63 s, el segundo empieza con el respiro
+  (21,97 s), el último respiro es un solo plano de 2,5 s y el resto, 18 cortes de 1,1 a
+  2,2 s. Los cortes suman 41,433 s, lo mismo que el vídeo.
 
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

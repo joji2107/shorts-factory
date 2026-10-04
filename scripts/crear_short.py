@@ -163,7 +163,9 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
             generar_ass(palabras_final, archivos["subtitulos"], config["subtitulos"], guion)
         elif paso == "fondo":
             if not edl_manual.exists():
-                crear_edl(palabras_final, voz_final, edl, biblioteca, config)
+                respiros = (json.loads(archivos["respiros"].read_text(encoding="utf-8"))
+                            if con_respiros else [])
+                crear_edl(palabras_final, voz_final, edl, biblioteca, config, guion, respiros)
             generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"])
         elif paso == "render":
             # Efectos escritos a mano en la configuración, o elegidos automáticamente
