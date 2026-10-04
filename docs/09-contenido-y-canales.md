@@ -15,6 +15,7 @@ y una pregunta que invite a comentar.
 | 3 | Hoja para leer el guion (`scripts/para_leer.py`) y short 003-rayo | `73eaf2d` |
 | 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | `73eaf2d` |
 | 5 | Short 004-elefante (estudio original) y final del vídeo tras la última palabra | |
+| 8 | Publicaciones y métricas: CSV, scripts, skill `registrar-metricas` y avisos en el servidor | |
 
 ---
 
@@ -322,6 +323,66 @@ antes, el primer corte del `cortes.txt` se acortó lo mismo para que cada plano 
 su frase. La versión con ruidos queda en `data/revision/005-caribe.mp4` y la nueva en
 `data/revision/005-caribe_sin_ruidos.mp4`.
 
+## Parte 8: publicaciones y métricas
+
+### Por qué
+Los 6 primeros shorts ya están publicados en YouTube, Instagram, TikTok y X, pero el
+proyecto no lo sabía: `listar_shorts` decía "sin vídeo (publicado o pendiente de
+procesar)". Y sin cifras guardadas no hay forma de saber qué técnica, tema o duración
+funciona mejor.
+
+### Dos archivos en `shorts/`
+- `publicaciones.csv`: short, plataforma, fecha y hora, archivo y `md5`. El `md5` hace
+  falta porque el nombre no basta: hay dos `002-caballo.mp4` distintos (el publicado, en
+  `listos/`, y el de los colores de la marca, en `revision/`).
+- `metricas.csv`: una línea por short, plataforma y momento (`48h` y `7d`). Guarda también
+  la técnica, el tema, la música y la duración del short, para comparar sin tener que
+  cruzar archivos.
+
+Una celda vacía es "no lo sé" y un 0 es "ninguno": si se mezclan, un dato que falta
+contaría como un fracaso. El porcentaje que se quedó a verlo solo lo da YouTube, así que
+en las otras plataformas el script no lo deja poner.
+
+Las horas de publicación de 001 a 006 son **aproximadas**: se sabía que el 001 salió hace
+unas 20 horas y el 006 hace unas 10. Repartir las demás a partes iguales habría puesto el
+004 publicado antes de existir (llegó a `listos/` a las 20:42), así que cada una va poco
+después de que su vídeo llegara a `listos/`. Llevan la nota `hora aproximada`.
+
+### Scripts
+```bash
+docker run --rm -v "$PWD:/proyecto" -w /proyecto/scripts shorts-whisper python registrar_metricas.py pendientes
+docker run --rm -v "$PWD:/proyecto" -w /proyecto/scripts shorts-whisper python registrar_metricas.py medida 001-pulpo youtube 48h --visualizaciones 1200 --likes 40
+docker run --rm -v "$PWD:/proyecto" -w /proyecto/scripts shorts-whisper python analizar_metricas.py
+```
+
+- `metricas.py`: módulo común, sin `print()` porque lo importa el servidor.
+- `registrar_metricas.py`: `publicacion`, `medida` y `pendientes`. Valida antes de
+  escribir (que el short esté publicado en esa plataforma, enteros donde toca, porcentaje
+  de 0 a 100, sin medidas repetidas), dice qué falta y avisa de lo raro: más likes que
+  visualizaciones o una medida hecha más de 12 h tarde. `--reemplazar` corrige o completa
+  una medida: en la primera versión sustituía la línea entera y, al añadir solo los
+  compartidos, se perdía todo lo demás.
+- `analizar_metricas.py`: cada plataforma por separado, medianas (un vídeo viral no
+  arrastra a su grupo) e interacciones por cada 1000 visualizaciones (si no, gana siempre
+  el que más se vio). Marca los grupos de menos de 3 shorts y avisa con menos de 10 por
+  plataforma. Con un solo short por tema, comparar temas es comparar shorts sueltos.
+
+### Servidor y skill
+- `estado_fabrica` dice qué shorts están publicados, qué medidas tocan ya y las 3
+  próximas; `listar_shorts`, dónde y cuándo se publicó cada short y qué medidas le faltan.
+- Skill `registrar-metricas`: lee las cifras escritas o de una captura con una tabla de
+  equivalencias por plataforma (el "tiempo de visualización" total no es la duración media,
+  ni el "porcentaje medio visto" es "se quedaron a verlo"), las enseña y espera el visto
+  bueno antes de escribir.
+
+### Comprobaciones
+Sobre una copia en `data/pruebas/metricas/` (`--carpeta`), con cifras inventadas: medida
+completa, incompleta (avisa de lo que falta), repetida (error), porcentaje en TikTok
+(error), likes con decimales (error), completar con `--reemplazar` (conserva lo anterior)
+y el análisis con 6 shorts en YouTube y 3 en TikTok (salen todos los avisos). Con los
+datos reales: ninguna medida pendiente hoy; la primera es 001-pulpo a las 48 h, el
+2026-10-05 a las 13:45.
+
 ## Problemas y soluciones
 
 | Síntoma | Causa | Solución | Prevención |
@@ -377,7 +438,7 @@ su frase. La versión con ruidos queda en `data/revision/005-caribe.mp4` y la nu
 - Publicar 001-pulpo y, al día siguiente, 002-caballo.
 - Decidir si se publica el 002-caballo nuevo (colores de la marca y subtítulos
   corregidos con el guion, en `data/revision/002-caballo.mp4`) en lugar del de `data/listos/`.
-- Reconectar el servidor MCP en Claude Code (`/mcp`) para que aparezca `ver_candidatos`.
+- Medir los 6 shorts publicados a las 48 h (desde el 2026-10-05) y a los 7 días (desde el 2026-10-10) con la skill `registrar-metricas`.
 - Probar el marcador amarillo con un fotograma suelto (parte 2).
 - 001-pulpo no tiene negritas en el guion: si se quieren palabras en amarillo, hay
   que marcarlas y rehacer sus subtítulos.

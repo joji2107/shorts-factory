@@ -67,9 +67,9 @@ Las rutas de las configuraciones (`audio_original`, `musica.archivo`, `efectos.a
 ## Servidor MCP
 
 `scripts/servidor_mcp.py` da a Claude herramientas concretas sobre la fábrica:
-- `estado_fabrica`: qué hay en bandeja, revisión, listos, errores y `data/entrada/`, más las últimas líneas de `registro.log`.
+- `estado_fabrica`: qué hay en bandeja, revisión, listos, errores y `data/entrada/`, qué shorts están publicados, las medidas de métricas que tocan ya y las 3 próximas, más las últimas líneas de `registro.log`.
 - `temas_disponibles`: etiquetas de vídeo de `biblioteca/indice.csv` y cuántos clips tiene cada una.
-- `listar_shorts`: las recetas de `shorts/` y el estado de su vídeo.
+- `listar_shorts`: las recetas de `shorts/`, el estado de su vídeo (`publicado` si está en `publicaciones.csv`), dónde y cuándo se publicó y qué medidas le faltan.
 - `preparar_short(grabacion, tema, short="")`: copia una grabación de `data/entrada/` a la bandeja como `NNN-tema`: el de la receta reservada de ese tema si la hay (`short` para elegir si hay varias) o el siguiente número libre (los 9xx se reservan para pruebas).
 - `ver_error(nombre)`: el `.log` de `data/errores/`.
 - `evaluar_material(tema, duracion_segundos=45)` (duración de la voz, sin la cola: la suma la herramienta): clips del tema con su duración y usos, si llegan sin repetir planos (estado *suficiente*, *justo* o *insuficiente*) y cuántos clips más harían falta.
@@ -93,6 +93,18 @@ Después prepara `publicacion.md` (paso 5; con `/guion-short NNN-tema` va direct
 Hoja para leer: **siempre** que un short está preparado, antes de arrancar el vigilante, se genera `shorts/NNN-tema/para_leer.html` con `scripts/para_leer.py NNN-tema` (en Docker) y se abre con `open`. Sale de `guion.md`: una frase por línea, la negrita en color, `(pausa)` en gris y las líneas `>` de la cabecera como notas de lectura.
 
 `scripts/creditos.py NNN-tema` (en Docker, después del render): toma los clips de la lista de cortes (`cortes.txt` o `cortes_auto.txt`; si no hay, los de la receta), la música y los efectos que suenan, busca sus autores en el índice y sustituye la línea `Créditos:` (versión larga, hasta la primera línea vacía) y la línea `Créditos: ...` (versión corta, para X). Luego mide cada bloque con `LIMITES` (comprobados el 2026-10-03; si cambian, actualizar también la tabla de la skill) y termina con código 1 si alguno se pasa. Repetirlo no cambia nada.
+
+## Publicaciones y métricas
+
+Dos CSV en `shorts/` (van a Git), escritos siempre con `scripts/registrar_metricas.py` (en Docker), nunca a mano:
+- `publicaciones.csv`: `short,plataforma,publicado,archivo,md5,notas`. Plataformas `youtube`, `instagram`, `tiktok`, `x`; fecha `AAAA-MM-DD HH:MM` (hora de Madrid). `archivo` y `md5` (8 caracteres) dicen qué versión exacta de `data/listos/` se publicó (hay dos `002-caballo.mp4` distintos). Las horas de 001 a 006 son aproximadas (nota `hora aproximada`).
+- `metricas.csv`: una línea por short, plataforma y momento (`48h` o `7d`): `medido`, `visualizaciones`, `se_quedaron_pct` (solo YouTube), `duracion_media_s`, `likes`, `comentarios`, `compartidos`, `seguidores`, y de la ficha `tecnica` (de `guion.md`), `tema`, `musica` y `duracion_s` (del vídeo publicado). Celda vacía = no se sabe; 0 = ninguno.
+
+`scripts/metricas.py` es el módulo común (sin `print()`, lo importa el servidor): lectura y escritura ordenada, `ficha()`, `pendientes()` (una medida es *pendiente* cuando han pasado 48 h o 168 h desde la publicación y no está, y *próxima* si aún no) y `nueva_medida()`, que valida (publicado en esa plataforma, enteros, porcentaje 0-100, sin duplicados) y devuelve lo que falta y avisos (más likes que visualizaciones, medida más de 12 h tarde o pronto). `registrar_metricas.py` tiene `publicacion`, `medida` (`--reemplazar` corrige o completa: lo que no se indica se conserva) y `pendientes`; `--carpeta data/pruebas/...` para probar sin tocar los CSV reales.
+
+`scripts/analizar_metricas.py [--momento] [--plataforma]`: por plataforma (nunca mezcladas), agrupa por técnica, tema y duración (menos de 40 s, 40-45, más de 45) con medianas, % visto e interacciones por cada 1000 visualizaciones. Marca con `*` los grupos de menos de 3 shorts, avisa con menos de 10 shorts por plataforma y cuando cada tema tiene un solo short (tema y técnica mezclados).
+
+Skill `registrar-metricas` (`.claude/skills/registrar-metricas/`): lee cifras escritas o capturas (con tabla de equivalencias por plataforma), las enseña y espera confirmación antes de escribir, avisa de lo que falta y de las medidas pendientes; también anota publicaciones nuevas y explica el análisis sin sacar conclusiones con pocos datos.
 
 ## Documentación
 

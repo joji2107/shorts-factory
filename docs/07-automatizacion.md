@@ -234,6 +234,31 @@ Además se corrigió la descripción del script: el vídeo terminado se **mueve*
 a `data/revision/` (no se copia), como se explica en "Gestión del
 almacenamiento".
 
+## Hora del registro
+
+Las horas de `data/registro.log` (y del sufijo `_AAAAMMDD-HHMM` de las
+grabaciones repetidas) salían 2 horas por detrás: el contenedor usa UTC si no
+se le dice otra cosa, y `datetime.now()` da la hora local *del contenedor*.
+
+La imagen base ya trae el paquete `tzdata` (los datos de las zonas horarias),
+así que basta con la variable `TZ`. Se añadió en `Dockerfile.whisper`:
+
+```dockerfile
+ENV TZ=Europe/Madrid
+```
+
+Así vale para todo lo que use la imagen (vigilante, `crear_short.py`, servidor
+MCP) sin cambiar ningún `docker run`. Al ir después del `pip install`, la
+reconstrucción sale entera de la caché. Los contenedores que ya estaban en
+marcha siguen con la imagen vieja hasta que se reinician.
+
+Comprobación: `docker run --rm shorts-whisper date` debe decir `CEST` (o `CET`
+en invierno; `Europe/Madrid` hace el cambio de hora solo).
+
+Nota: al parar el vigilante con `docker stop vigilante` sale el código 137.
+No es un error: Python es el proceso principal del contenedor (PID 1) e ignora
+la señal SIGTERM, así que a los 10 s Docker lo mata con SIGKILL (128 + 9).
+
 ## Pendiente
 - Margen inicial configurable para los efectos (ninguno en los primeros
   segundos del gancho).
@@ -248,3 +273,4 @@ almacenamiento".
   almacenamiento").
 - El vigilante ya no sobrescribe grabaciones archivadas e ignora los
   archivos vacíos (ver "Robustez del vigilante").
+- El registro usa la hora de España en vez de UTC (ver "Hora del registro").

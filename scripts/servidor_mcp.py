@@ -24,6 +24,7 @@ from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 
 import material
+import metricas
 
 RAIZ = Path(__file__).resolve().parent.parent
 DATA = RAIZ / "data"
@@ -313,11 +314,22 @@ def _anadir_al_indice(fila):
 @servidor.tool()
 def estado_fabrica(lineas_registro: int = 15) -> str:
     """Resumen de la fábrica: qué hay en la bandeja, en revisión, listo para publicar
-    y con errores, y las últimas líneas del registro del vigilante."""
+    y con errores, qué está publicado, qué medidas de métricas tocan (48h o 7d) y las
+    últimas líneas del registro del vigilante."""
+    publicados = sorted({p["short"] for p in metricas.leer_publicaciones()})
+    medidas = metricas.pendientes()
+    ahora = [m for m in medidas if m["estado"] == "pendiente"]
+    proximas = [m for m in medidas if m["estado"] == "próxima"][:3]
     partes = [
         f"Bandeja (pendientes): {_nombres(BANDEJA) or 'vacía'}",
         f"En revisión: {_nombres(DATA / 'revision', '*.mp4') or 'ninguno'}",
-        f"Listos para publicar: {_nombres(DATA / 'listos', '*.mp4') or 'ninguno'}",
+        f"Listos (aprobados): {_nombres(DATA / 'listos', '*.mp4') or 'ninguno'}",
+        f"Publicados: {_contar(len(publicados), 'short')} ({', '.join(publicados) or 'ninguno'})",
+        "Medidas pendientes ahora: " + (", ".join(
+            f"{m['short']} {m['plataforma']} {m['momento']}" for m in ahora) or "ninguna"),
+        "Próximas medidas: " + (", ".join(
+            f"{m['short']} {m['plataforma']} {m['momento']} ({m['cuando']:%Y-%m-%d %H:%M})"
+            for m in proximas) or "ninguna"),
         f"Con errores: {_nombres(DATA / 'errores', '*.log') or 'ninguno'}",
         f"Grabaciones disponibles en data/entrada: {_nombres(ENTRADA) or 'ninguna'}",
     ]
@@ -390,19 +402,34 @@ def evaluar_material(tema: str, duracion_segundos: float = 45) -> str:
 
 @servidor.tool()
 def listar_shorts() -> list[dict]:
-    """Los shorts que tienen receta en shorts/ y en qué estado está su vídeo."""
+    """Los shorts que tienen receta en shorts/, en qué estado está su vídeo, dónde y
+    cuándo se ha publicado (de shorts/publicaciones.csv) y qué medidas de métricas le
+    faltan: 'pendiente' si ya toca, 'próxima' con la fecha si todavía no."""
+    publicaciones = metricas.leer_publicaciones()
+    medidas = metricas.pendientes()
     resultado = []
     for receta in sorted(p for p in (RAIZ / "shorts").iterdir() if p.is_dir()):
         nombre = receta.name
-        if (DATA / "listos" / f"{nombre}.mp4").exists():
+        publicado = {p["plataforma"]: p["publicado"] for p in publicaciones if p["short"] == nombre}
+        if publicado:
+            estado = "publicado"
+        elif any((DATA / "listos").glob(f"{nombre}*.mp4")):
             estado = "listo para publicar"
         elif (DATA / "revision" / f"{nombre}.mp4").exists():
             estado = "pendiente de revisión"
         elif (DATA / "errores" / f"{nombre}.log").exists():
             estado = "con error"
         else:
-            estado = "sin vídeo (publicado o pendiente de procesar)"
-        resultado.append({"short": nombre, "estado": estado})
+            estado = "sin vídeo (reservado o pendiente de procesar)"
+        ficha = {"short": nombre, "estado": estado}
+        if publicado:
+            ficha["publicado"] = publicado
+            ficha["medidas_pendientes"] = [
+                f"{m['plataforma']} {m['momento']}: " + (
+                    "ya toca" if m["estado"] == "pendiente" else f"el {m['cuando']:%Y-%m-%d %H:%M}")
+                for m in medidas if m["short"] == nombre
+            ]
+        resultado.append(ficha)
     return resultado
 
 

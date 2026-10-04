@@ -68,6 +68,9 @@
 | `lectura.py` | 46 | Velocidad de lectura: mediana de las últimas 5 muestras de `config/lectura.json`. |
 | `para_leer.py` | 112 | **Nuevo.** Hoja HTML para leer el guion: una frase por línea, la negrita en color, las pausas en gris y las notas de lectura. |
 | `creditos.py` | 225 | **Nuevo.** Créditos de los archivos usados, sacados del índice, y medida de cada texto con `LIMITES` (comprobados el 2026-10-03). |
+| `metricas.py` | — | **Nuevo (parte 8).** Módulo común de `publicaciones.csv` y `metricas.csv`: validación, ficha y medidas pendientes. |
+| `registrar_metricas.py` | — | **Nuevo (parte 8).** Órdenes `publicacion`, `medida` y `pendientes`. |
+| `analizar_metricas.py` | — | **Nuevo (parte 8).** Compara por técnica, tema y duración, por plataforma, con avisos de pocos datos. |
 | `servidor_mcp.py` | 603 | Servidor MCP por stdio (sin `print()`); ver la tabla de abajo. |
 
 ### Pasos (`scripts/pasos/`)
@@ -85,9 +88,9 @@
 
 | Herramienta | Parámetros | Qué hace |
 |---|---|---|
-| `estado_fabrica` | `lineas_registro=15` | Bandeja, revisión, listos, errores, entrada y el final del registro. |
+| `estado_fabrica` | `lineas_registro=15` | Bandeja, revisión, listos, errores, entrada, shorts publicados, medidas que tocan y las 3 próximas, y el final del registro. |
 | `temas_disponibles` | — | Etiquetas de vídeo del índice y cuántos clips tiene cada una. |
-| `listar_shorts` | — | Recetas de `shorts/` y el estado de su vídeo. |
+| `listar_shorts` | — | Recetas de `shorts/`, el estado de su vídeo, dónde y cuándo se publicó y qué medidas le faltan. |
 | `preparar_short` | `grabacion`, `tema`, `short=""` | Copia una grabación de `data/entrada/` a la bandeja como `NNN-tema`. Usa la receta reservada del tema si la hay; los 9xx son pruebas. |
 | `ver_error` | `nombre` | El `.log` de `data/errores/`. |
 | `evaluar_material` | `tema`, `duracion_segundos=45` | Dice si los clips del tema llegan sin repetir planos. La duración es la de la voz **sin la cola**, porque la herramienta ya la suma. |
@@ -100,7 +103,10 @@ ella.
 
 ### Skills
 
-Solo hay una: **`guion-short`** (`.claude/skills/guion-short/`). Con un tema hace los
+**`registrar-metricas`** (parte 8): registra cifras escritas o de capturas, avisa de lo que falta,
+anota publicaciones y explica el análisis.
+
+**`guion-short`** (`.claude/skills/guion-short/`). Con un tema hace los
 pasos 2 a 6 del flujo: guion, ficha, material, cierre con la hoja para leer y
 publicación. Con un short que ya existe (`/guion-short 003-rayo`) va directa a los
 textos de publicación. Al cargarse recibe la situación actual: velocidad de lectura,
@@ -266,8 +272,11 @@ repositorio no queda constancia de qué se ha publicado ya.
 
 ## 6. Métricas
 
-`shorts/metricas.csv` **no existe**: no hay ningún archivo de métricas en el proyecto,
-así que no hay nada que resumir. Ver el punto pendiente en la sección 7.
+`shorts/metricas.csv` todavía no tiene medidas: se creó el 2026-10-04 (fase 9, parte 8)
+junto con `shorts/publicaciones.csv`, que ya registra los 6 shorts publicados en
+YouTube, Instagram, TikTok y X (con horas aproximadas). La primera medida toca el
+2026-10-05 a las 13:45 (001-pulpo, 48 h). Se registran con la skill `registrar-metricas`
+y se comparan con `scripts/analizar_metricas.py`.
 
 ## 7. Problemas conocidos, pendientes y mejoras
 
@@ -305,9 +314,7 @@ así que no hay nada que resumir. Ver el punto pendiente en la sección 7.
 - Bitácora de la fase 9: falta la parte 7 (006-columna), los commits de las partes 5
   a 7 en la tabla y actualizar los pendientes (el de reconectar el MCP ya está hecho).
 - Hacer commit de la sección "Hora del registro" de `docs/07`.
-- Empezar a registrar métricas (`shorts/metricas.csv`), por ejemplo: short,
-  plataforma, fecha de publicación, visualizaciones, retención media, me gusta y
-  comentarios. Sin datos no se puede saber qué técnicas o temas funcionan mejor.
+- Medir los shorts publicados a las 48 h y a los 7 días (`registrar-metricas`).
 - Cerrar la fase 9: estado y tabla de documentos del `README.md` y unir a `main`.
 
 ### Partes del código que mejoraría
