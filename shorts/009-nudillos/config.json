@@ -1,0 +1,43 @@
+{
+  "voz": {
+    "inicio": "auto",
+    "umbral_silencio": "-40dB",
+    "margen_inicio": 0.15
+  },
+  "musica": {
+    "archivo": "data/biblioteca/musica/relajada_02.mp3"
+  },
+  "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ],
+    "lista": [
+      {
+        "archivo": "data/biblioteca/sfx/ding_02.mp3",
+        "palabra": "artritis",
+        "vez": 2
+      },
+      {
+        "archivo": "data/biblioteca/sfx/riser_01.mp3",
+        "palabra": "curioso"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/whoosh_01.mp3",
+        "palabra": "resonancia"
+      }
+    ]
+  },
+  "audio_original": "data/archivo/009-nudillos.wav",
+  "video": {
+    "clips": [
+      "nudillos_04",
+      "nudillos_08",
+      "nudillos_03",
+      "nudillos_06",
+      "nudillos_07",
+      "nudillos_02"
+    ]
+  }
+}

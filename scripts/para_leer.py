@@ -41,6 +41,7 @@ def marcar(texto):
     """Texto del guion a HTML: **negrita** en <strong> y (pausa) en gris."""
     texto = html.escape(texto, quote=False)
     texto = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", texto)
+    texto = re.sub(r"`(.+?)`", r"<code>\1</code>", texto)
     return texto.replace("(pausa)", '<span class="pausa">(pausa)</span>')
 
 
@@ -75,10 +76,18 @@ def generar(nombre):
     if segundos:
         resumen.append(f"unos {round(float(segundos.group(1).replace(',', '.')))} segundos")
     notas = " ".join(linea.lstrip("> ").strip() for linea in cabecera.splitlines() if linea.startswith(">"))
+    # Un texto que no es un short (una prueba de voz) dice en "**Grabación:**" dónde se guarda
+    grabacion = re.search(r"\*\*Grabación:\*\*\s*(.+)", cabecera)
+    if grabacion:
+        donde = [f"{marcar(grabacion.group(1).strip())}<br>"]
+    else:
+        donde = [f"Guarda la grabación como <code>{nombre}.wav</code> en <code>data/bandeja/</code>",
+                 "(con el vigilante en marcha).<br>",
+                 # Prueba de voz (fase 9, parte 10): con el micro cerca, la voz gana 3-4 dB sobre el ruido
+                 "<strong>Micro a 10-15 cm</strong> de la boca.<br>"]
 
     aviso = [f"<strong>{nombre}</strong>{': ' + ', '.join(resumen) if resumen else ''}.<br>",
-             f"Guarda la grabación como <code>{nombre}.wav</code> en <code>data/bandeja/</code>",
-             "(con el vigilante en marcha).<br>",
+             *donde,
              '<strong>Negrita</strong> = énfasis · <span class="pausa">(pausa)</span> = respira, no se lee.',
              "Lee a tu ritmo: la duración la marca tu voz."]
     if notas:

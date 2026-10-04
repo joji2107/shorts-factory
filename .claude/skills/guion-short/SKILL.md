@@ -231,6 +231,8 @@ Dile al usuario:
   para dejarla en `data/bandeja/` con el vigilante en marcha. O bien dejarla en
   `data/entrada/` con cualquier nombre y pedir `preparar_short`, que usará esta
   receta reservada.
+- Que grabe con el **micro a 10-15 cm** de la boca: en la prueba de voz (fase 9, parte 10)
+  es lo que más mejoró el sonido (3-4 dB más de voz sobre el ruido).
 - Que lea el guion a su ritmo: la duración real la marca su voz. El vigilante
   elegirá los clips con esa duración, anotará en `data/registro.log` si el material
   no alcanza, y al terminar sumará la grabación a la velocidad de lectura.

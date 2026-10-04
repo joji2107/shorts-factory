@@ -2,7 +2,8 @@
   "voz": {
     "inicio": 0,
     "quitar_ruidos": {"umbral": "-35dB", "duracion_max": 0.15, "hueco_min": 0.2, "margen": 0.15},
-    "cadena": "highpass=f=80,afftdn=nr=14:nf=-66,bass=g=2:f=120,equalizer=f=300:t=q:w=1:g=-3,equalizer=f=4000:t=q:w=1:g=3,treble=g=2:f=10000,acompressor=threshold=-24dB:ratio=3:attack=10:release=200,acompressor=threshold=-16dB:ratio=4:attack=5:release=60,loudnorm=I=-14:TP=-1.5:LRA=11"
+    "cadena": "highpass=f=80,afftdn=nr=14:nf=-66,bass=g=2:f=120,equalizer=f=300:t=q:w=1:g=-3,equalizer=f=4000:t=q:w=1:g=3,treble=g=2:f=10000,acompressor=threshold=-24dB:ratio=3:attack=10:release=200,acompressor=threshold=-16dB:ratio=4:attack=5:release=60",
+    "normalizar": {"lufs": -17, "pico": -1.5}
   },
   "transcripcion": {
     "modelo": "medium",

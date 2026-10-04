@@ -16,7 +16,8 @@ y una pregunta que invite a comentar.
 | 4 | Correcciones del 003-rayo: clips reales, bucle, efectos y subtítulos | `73eaf2d` |
 | 5 | Short 004-elefante (estudio original) y final del vídeo tras la última palabra | |
 | 8 | Publicaciones y métricas: CSV, scripts, skill `registrar-metricas` y avisos en el servidor | `ac708a3` |
-| 9 | Shorts 007-cambio_hora y 008-orionidas: temas de actualidad, cifras mezcladas en negrita y la estrella fugaz animada | |
+| 9 | Shorts 007-cambio_hora y 008-orionidas: temas de actualidad, cifras mezcladas en negrita y la estrella fugaz animada | `61a7098` |
+| 10 | Prueba controlada de la voz: micro cerca y cadena sin `loudnorm` (voz a -17 LUFS con ganancia fija) | |
 
 ---
 
@@ -445,6 +446,98 @@ la estrella cruza dos veces, la primera justo en «entran en el aire a más de d
 mil kilómetros por hora». La primera versión queda en `data/pruebas/008-orionidas_v1.mp4`.
 Lección: un clip que solo muestra el tema unos instantes hay que mirarlo segundo a
 segundo antes de dejar el reparto al azar.
+
+## Parte 10: prueba controlada de la voz
+
+### Objetivo
+Mejorar el sonido de la voz con una comparación justa antes de tocar
+`config/por_defecto.json`: tres tomas del mismo texto (`toma_actual`, `toma_manta` con
+mantas detrás y alrededor del micro, `toma_cerca` con el micro a 10-15 cm), cada una con
+la cadena actual y con variantes que cambian **una sola cosa**, todas a -16 LUFS.
+
+### Texto y hoja
+`shorts/901-prueba_voz/guion.md` (9xx = pruebas, sin `config.json` para que nunca sea una
+receta reservada): 59 palabras, unos 20 s, con eses, p/b/t y un final con énfasis. La hoja
+decía siempre «Guarda la grabación en `data/bandeja/`», que aquí habría hecho que el
+vigilante intentara un short: ahora `para_leer.py` usa la línea `**Grabación:**` de la
+cabecera si existe. Las hojas de 003 a 008 salen idénticas.
+
+### `scripts/comparar_voz.py`
+- Versiones: sin procesar, cadena actual, (a) `afftdn` con `nr=7` en vez de 14, (b)
+  de-esser después de `treble`, (c) `bass=g=4:f=150` en vez de `g=2:f=120`.
+- Medidas con la ponderación de los LUFS: ruido de la sala (mediana del volumen
+  momentáneo en el silencio de 0,5 a 3,5 s), voz (integrado), voz/ruido y pico real. En
+  cada versión, el ruido que queda se mide en el segundo de silencio antes de la voz.
+- Igualado a -16 LUFS en dos pasadas; si el pico pasa de -1 dBTP, `alimiter`, y la página
+  dice cuántos dB recorta (en la toma sin procesar, unos 6 dB: su voz tiene picos ~21 dB
+  por encima de su volumen medio).
+- `comparar.html`: tabla por toma y escucha a ciegas (orden al azar, nota del 1 al 5,
+  «Revelar» ordena por nota; se guarda en el navegador).
+
+### El de-esser: medir en vez de suponer
+- El filtro `deesser` de FFmpeg apenas hacía nada (0,5 dB en las eses).
+- `adynamicequalizer` tiene un `threshold` «de 0 a 100» sin unidades. Con `--calibrar`
+  (grabación del 007, solo lectura) resultó funcionar **al revés**: 0 no hace nada y con 5
+  ya baja 16 dB la zona de 5-9 kHz en las eses y casi 10 dB en el resto. Con **0,5**: 4 dB
+  en los silbidos y 1,5 dB en el resto. Cambiar el Q de detección no cambiaba nada.
+
+### Dos fallos encontrados con una toma sintética
+4 s de ruido rosa conocido + la voz del 007, para comprobar las medidas antes de grabar:
+- El ruido salía `None`: `ebur128=framelog=verbose` solo escribe en el nivel de registro
+  *verbose*; con `framelog=info`, sí.
+- Procesando la toma entera (con 4 s de ruido delante) la cadena actual salía a -28,5 LUFS
+  y la de menos ruido a -17: `afftdn` y el `loudnorm` dinámico del final se comportan
+  distinto si empiezan con segundos de ruido. `voz.py` recorta el silencio **antes** de la
+  cadena, así que el script hace lo mismo (dejando 1 s). Después, las cinco versiones
+  salen a -17 LUFS y el ruido rosa se mide en -65 LUFS, como se generó.
+
+### Resultados
+Ruido de la sala casi igual en las tres tomas (de -65,8 a -66,6 LUFS). Voz/ruido en las
+pausas entre frases (dB; medido en ventanas de 50 ms que la toma original clasifica como
+voz o pausa, para que todas las versiones se midan en los mismos instantes):
+
+| Toma | Sin procesar | Cadena actual | (a) menos ruido | (b) de-esser | (c) cuerpo | (d) sin loudnorm |
+|---|---|---|---|---|---|---|
+| actual | 34,3 | 35,9 | 34,8 | 35,5 | 35,5 | 38,6 |
+| manta | 34,4 | 35,9 | 34,3 | 35,7 | 35,6 | 39,9 |
+| **cerca** | 38,2 | 38,7 | 37,2 | 38,0 | 38,7 | **42,7** |
+
+- **Grabar con el micro a 10-15 cm** es lo que más mejora: 3-4 dB más de voz sobre el
+  ruido. Las mantas no cambian el ruido (sirven contra el eco, que estas cifras no miden).
+- **Primera medida equivocada**: el ruido de cada versión se medía en el segundo de
+  silencio antes de la voz y daba «las mantas, 8 dB mejor». Era el `loudnorm` dinámico
+  del final de la cadena: arranca con demasiada ganancia y subía ese silencio unos 40 dB
+  (de -70 a -29 LUFS en la toma cerca). Se pasó a medir en las pausas.
+- **Escucha a ciegas**: la toma cerca con la cadena actual era la mejor «una vez hablo»,
+  pero con «un ruido muy fuerte antes de empezar a hablar» (el arranque del loudnorm). Se
+  añadió la variante (d), la cadena sin `loudnorm`: el ruido del arranque baja a -75 LUFS
+  y las pausas ganan 4 dB. **Elegida: toma cerca, sin `loudnorm`.**
+
+### El cambio en la cadena
+- `config/por_defecto.json`: la cadena acaba en los compresores y un bloque nuevo,
+  `voz.normalizar` (`lufs`, `pico`).
+- `voz.py`: `normalizar()` mide la voz procesada, le da una ganancia fija y, si algún
+  pico pasa de -1,5 dBTP, `alimiter`. Si el limitador baja el volumen más de 0,3 dB, corrige
+  la ganancia en una segunda pasada.
+- **¿Por qué -17 LUFS y no -14?** Con -14, el short de prueba quedó a -15,9 y con 9 dB de
+  recorte de picos. Midiendo la voz procesada de 001 a 008 resultó que el loudnorm nunca
+  llegaba a -14: la dejaba entre -14,6 y -17,6, casi siempre a -17. Con -17 el equilibrio con
+  la música que ya estaba aprobado no cambia, y el limitador recorta unos 6,8 dB, como en
+  la versión elegida a ciegas. Además, la voz queda siempre igual de fuerte.
+- **Descartado: ganancia antes de la cadena**, para que los compresores trabajen igual con
+  cualquier grabación. El recorte del limitador apenas bajaba (de 9 a 8 dB) y la voz/ruido
+  en las pausas empeoraba hasta 9 dB.
+- Los picos de la voz están de forma natural unos 21 dB por encima de su volumen medio:
+  algo tiene que recortarlos. Antes lo hacía el limitador interno del loudnorm (la voz del
+  008 tenía picos 15,8 dB sobre su volumen; la nueva, 14,5 dB, y la misma LRA de 2 LU).
+
+### Comprobación
+Short de prueba 908-orionidas (la grabación, los cortes y la música del 008, ya borrado):
+voz a -17,2 LUFS, limitador 6,8 dB, vídeo final a -14,82 LUFS (el 008 publicado: -14,81).
+Escuchado junto al 008 y aprobado. El vídeo queda en
+`data/pruebas/voz/908-orionidas_sin_loudnorm.mp4`.
+
+La hoja para leer y la skill recuerdan ahora grabar con el micro a 10-15 cm.
 
 ## Problemas y soluciones
 
