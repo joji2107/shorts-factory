@@ -14,7 +14,8 @@ import sys
 
 from crear_short import RAIZ
 
-PARTES = ("Gancho", "Dato", "Giro", "Remate")
+# Las de la estructura clásica y las de la fábrica 2.0 (promesa y recompensa)
+PARTES = ("Gancho", "Dato", "Giro", "Remate", "Promesa", "Escalones", "Revelación", "Cierre")
 
 ESTILO = """\
   :root { --texto: #1d1d1f; --suave: #8a8a8e; --fondo: #fbfaf7; --marca: #b4533a; }
@@ -38,8 +39,13 @@ ESTILO = """\
 
 
 def marcar(texto):
-    """Texto del guion a HTML: **negrita** en <strong> y (pausa) en gris."""
+    """Texto del guion a HTML: **negrita** en <strong> y (pausa) en gris. De las marcas de
+    montaje (fábrica 2.0), [plano ...] no sale y [respiro] sale en gris: el silencio lo
+    pone el sistema, así que no hay que pararse."""
+    texto = re.sub(r"\s*\[plano\b[^\]]*\]", "", texto, flags=re.I)
+    texto = re.sub(r"\[respiro\b[^\]]*\]", "\x00", texto, flags=re.I)
     texto = html.escape(texto, quote=False)
+    texto = texto.replace("\x00", '<span class="pausa">(respiro: sigue leyendo normal, el silencio lo pone el sistema)</span>')
     texto = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", texto)
     texto = re.sub(r"`(.+?)`", r"<code>\1</code>", texto)
     return texto.replace("(pausa)", '<span class="pausa">(pausa)</span>')

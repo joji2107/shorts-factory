@@ -39,14 +39,28 @@ def normalizar(palabra):
     return re.sub(r"[\W_]", "", sin_tildes.lower())
 
 
+def seccion_guion(ruta):
+    """El texto de la sección '## Guion' de guion.md ("" si no la tiene)."""
+    seccion = re.search(r"^## Guion\s*$(.*?)(?=^## |\Z)", ruta.read_text(encoding="utf-8"), re.M | re.S)
+    return seccion.group(1) if seccion else ""
+
+
+def solo_lo_que_se_dice(texto):
+    """Quita lo que no se lee en voz alta: las etiquetas (**Gancho:**), las (pausa) y las
+    marcas de montaje entre corchetes ([respiro 3], [plano volcan_03 12 6])."""
+    texto = re.sub(r"^\*\*[^*\n]+:\*\*", " ", texto, flags=re.M)
+    texto = re.sub(r"\(pausa\)", " ", texto, flags=re.I)
+    return re.sub(r"\[[^\]]*\]", " ", texto)
+
+
 def palabras_del_guion(ruta):
     """Las palabras que se dicen en el guion: (normalizada, True si va en negrita, tal cual).
-    Solo cuenta la sección '## Guion', sin las etiquetas (**Gancho:**) ni las (pausa)."""
-    seccion = re.search(r"^## Guion\s*$(.*?)(?=^## |\Z)", ruta.read_text(encoding="utf-8"), re.M | re.S)
-    if not seccion:
-        return []
-    texto = re.sub(r"^\*\*[^*\n]+:\*\*", " ", seccion.group(1), flags=re.M)
-    texto = re.sub(r"\(pausa\)", " ", texto, flags=re.I)
+    Solo cuenta la sección '## Guion', sin etiquetas, (pausa) ni marcas."""
+    return palabras_de_texto(solo_lo_que_se_dice(seccion_guion(ruta)))
+
+
+def palabras_de_texto(texto):
+    """(normalizada, en negrita, tal cual) de cada palabra de un trozo de guion ya limpio."""
     resultado, negrita = [], False
     for trozo in texto.split():
         # Cada "**" abre o cierra la negrita; la puntuación se queda pegada ("**rayo**." -> "rayo.")

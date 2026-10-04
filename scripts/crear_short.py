@@ -9,6 +9,8 @@ from pathlib import Path
 
 from pasos.voz import procesar_voz
 from pasos.transcripcion import transcribir
+from pasos.respiros import crear_respiros
+from pasos.marcas import leer_marcas, respiros_del_guion
 from pasos.subtitulos import generar_ass
 from pasos.cortes import crear_edl, elegir_efectos
 from pasos.montaje import generar_fondo, render
@@ -17,12 +19,15 @@ from pasos.utilidades import duracion, silencio_inicial
 RAIZ = Path(__file__).resolve().parent.parent   # la carpeta del proyecto
 
 # Cada paso y los pasos de los que depende. El orden es el de ejecución.
+# "respiros" (fábrica 2.0) solo se ejecuta con respiros.activo: si no, se salta sin
+# contar como rehecho y los pasos siguientes trabajan con voz.wav y palabras.json.
 DEPENDE_DE = {
     "voz": [],
     "transcripcion": ["voz"],
-    "subtitulos": ["transcripcion"],
-    "fondo": ["transcripcion"],
-    "render": ["fondo", "voz", "subtitulos"],
+    "respiros": ["transcripcion"],
+    "subtitulos": ["transcripcion", "respiros"],
+    "fondo": ["transcripcion", "respiros"],
+    "render": ["fondo", "voz", "subtitulos", "respiros"],
 }
 PASOS = list(DEPENDE_DE)
 
@@ -112,16 +117,30 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
     archivos = {
         "voz": trabajo / "voz.wav",
         "transcripcion": trabajo / "palabras.json",
+        "respiros": trabajo / "respiros.json",
         "subtitulos": trabajo / "subtitulos.ass",
         "fondo": trabajo / "fondo.mp4",
         "render": trabajo / "final.mp4",
     }
 
+    # Con respiros, lo que viene después de la transcripción usa la voz con los silencios
+    # y los tiempos desplazados
+    guion = receta / "guion.md"
+    con_respiros = config["respiros"]["activo"]
+    voz_final = trabajo / "voz_respiros.wav" if con_respiros else archivos["voz"]
+    palabras_final = trabajo / "palabras_respiros.json" if con_respiros else archivos["transcripcion"]
+    if not con_respiros and any(m["tipo"] == "respiro" for m in leer_marcas(guion)):
+        print("AVISO: el guion tiene [respiro], pero respiros.activo es false: se ignoran")
+
     inicio = time.perf_counter()
     rehechos = set()
     for paso in PASOS:
+        if paso == "respiros" and not con_respiros:
+            continue
         if paso == "transcripcion" and despues_de_voz:
-            despues_de_voz(config, duracion(archivos["voz"]) + config["final"]["cola"])
+            silencios = (sum(s for _, s, _ in respiros_del_guion(guion, config["respiros"]["segundos"]))
+                         if con_respiros else 0)
+            despues_de_voz(config, duracion(archivos["voz"]) + silencios + config["final"]["cola"])
         necesario = (
             paso == rehacer
             or not archivos[paso].exists()
@@ -137,20 +156,22 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
         elif paso == "transcripcion":
             transcribir(archivos["voz"], trabajo / "subtitulos.srt",
                         archivos["transcripcion"], config["transcripcion"])
+        elif paso == "respiros":
+            crear_respiros(archivos["voz"], archivos["transcripcion"], guion, voz_final,
+                           palabras_final, archivos["respiros"], config["respiros"])
         elif paso == "subtitulos":
-            generar_ass(archivos["transcripcion"], archivos["subtitulos"], config["subtitulos"],
-                        receta / "guion.md")
+            generar_ass(palabras_final, archivos["subtitulos"], config["subtitulos"], guion)
         elif paso == "fondo":
             if not edl_manual.exists():
-                crear_edl(archivos["transcripcion"], archivos["voz"], edl, biblioteca, config)
+                crear_edl(palabras_final, voz_final, edl, biblioteca, config)
             generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"])
         elif paso == "render":
             # Efectos escritos a mano en la configuración, o elegidos automáticamente
-            efectos = anclar_a_palabras(config["efectos"]["lista"], archivos["transcripcion"])
+            efectos = anclar_a_palabras(config["efectos"]["lista"], palabras_final)
             if not efectos and config["efectos"]["automaticos"] > 0:
-                efectos = elegir_efectos(edl, archivos["transcripcion"], config)
-            palabras = json.loads(archivos["transcripcion"].read_text(encoding="utf-8"))
-            render(archivos["fondo"], archivos["voz"], archivos["subtitulos"],
+                efectos = elegir_efectos(edl, palabras_final, config)
+            palabras = json.loads(palabras_final.read_text(encoding="utf-8"))
+            render(archivos["fondo"], voz_final, archivos["subtitulos"],
                    trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos,
                    palabras[-1]["fin"] if palabras else None)
 
