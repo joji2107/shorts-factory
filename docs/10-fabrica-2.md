@@ -16,7 +16,8 @@ receta, para que los shorts anteriores se sigan reproduciendo igual.
 | 3 | Ritmo variable y planos protagonistas (`cortes.py`, `material.py`) | `66f357d` |
 | 4 | Música con energía: `musica.json`, inicio automático y subida en los respiros | `5cb861f` |
 | 5 | Skill `guion-short` (sección Fábrica 2.0), `hoja_fotogramas.py` y `evaluar_material` con versión | `9e31343` |
-| 6 | Prueba completa (011-volcan) y 2.0 como versión por defecto | |
+| 6 | Prueba completa (011-volcan) y 2.0 como versión por defecto | `a194a80`, `4f803ec` |
+| 7 | Scripts `arrancar.sh` y `apagar.sh` | |
 
 ---
 
@@ -222,6 +223,28 @@ comparó, en una carpeta aparte, antes y después de promover:
 El «antes» se ejecutó dos veces para comprobar que la prueba es repetible. Sin la línea
 `"version_fabrica": "1.0"`, 004 heredaría la 2.0 (respiros, ritmo y música automática):
 esa línea es lo que lo mantiene igual.
+
+## Arrancar y apagar: `arrancar.sh` y `apagar.sh`
+
+Dos scripts en la raíz (se ejecutan en el Mac, no en Docker) para el día a día:
+- **`./arrancar.sh`**: `colima start` si `colima status` dice que no está en marcha, comprueba
+  que Docker responde y que existe la imagen `shorts-whisper`, lanza el vigilante si no hay
+  un contenedor `vigilante` corriendo y enseña el estado (Colima, vigilante con las 3 últimas
+  líneas del registro, bandeja, rama y cambios sin guardar). Acaba recordando abrir Claude Code.
+- **`./apagar.sh`**: se niega (código 1) si hay audios en la bandeja o un short procesándose,
+  avisa de los cambios sin guardar en Git, para el vigilante con `docker kill
+  --signal=SIGINT` (espera hasta 30 s a que salga) y hace `colima stop`.
+
+**Por qué se niega con un short en marcha**: el vigilante solo atrapa `KeyboardInterrupt`
+alrededor del bucle, y `procesar()` solo atrapa `Exception`, que no lo incluye. Un SIGINT a
+mitad de un short lo corta: la grabación ya está en `data/archivo/` y el short queda a medias,
+sin pasar a `errores/`. Para saber si hay uno en marcha, `awk` busca en el registro el último
+`INICIO <short>` y mira si después está su `OK` o su `ERROR`.
+
+Los dos se pueden repetir: con todo en marcha, `arrancar.sh` no relanza nada; con todo
+apagado, `apagar.sh` dice «Colima ya está parado» y sale con 0. Probado: dos arranques
+seguidos (desde `/tmp`), apagado con la bandeja ocupada y con un registro falso con un
+`INICIO` abierto (se niega en los dos), y apagado real dos veces seguidas.
 
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

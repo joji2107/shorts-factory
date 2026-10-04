@@ -24,14 +24,22 @@ Shorts hechos: 2 (`shorts/001-pulpo` y `shorts/002-caballo`, este en revisión).
 
 ## Uso diario
 
-1. Arrancar Colima: `colima start`
-2. Arrancar el vigilante en segundo plano:
+```bash
+./arrancar.sh    # Colima + vigilante (si no están en marcha) y estado: Colima, vigilante, bandeja, Git
+./apagar.sh      # se niega si hay audios en la bandeja o un short procesándose; avisa de
+                 # cambios sin guardar en Git; para el vigilante con SIGINT y apaga Colima
+```
+
+Los dos se pueden ejecutar varias veces: lo que ya está en marcha (o parado) no se toca.
+Lo que hacen por dentro, por si hace falta a mano:
 
 ```bash
+colima start
 docker run -d --rm --name vigilante -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
   shorts-whisper python /proyecto/scripts/vigilar_bandeja.py --plantilla curiosidades
 docker logs -f vigilante                  # ver lo que hace (Ctrl+C solo deja de mirar)
 docker kill --signal=SIGINT vigilante     # pararlo (también tras cambiar código, y volver a arrancarlo)
+colima stop
 ```
 
 3. Grabar la voz y soltarla en `data/bandeja/` con el nombre `NNN-tema.wav`
@@ -54,9 +62,10 @@ De encender el Mac a tener el short en revisión. Claude Code trabaja en modo
 manual: pide permiso antes de cada comando y explica qué va a hacer.
 
 1. **Abrir la terminal** en el proyecto: `cd ~/shorts-factory`.
-2. **Arrancar Colima**: `colima start`. Comprobar con `docker ps` que responde.
-3. **Arrancar el vigilante** en segundo plano (comando de "Uso diario", paso 2).
-   Al apagar el Mac se para, así que hay que arrancarlo cada vez.
+2. **Arrancar el sistema**: `./arrancar.sh` (Colima y el vigilante en segundo plano).
+   Al apagar el Mac se paran, así que hay que arrancarlo cada vez.
+3. **Mirar el estado** que enseña al final: Colima y vigilante en marcha, audios
+   en la bandeja, rama de Git y cambios sin guardar.
 4. **Abrir Claude Code**: `claude`. Comprobar en la barra de estado que pone
    `⏸ manual mode on` (si no, `Shift+Tab` hasta verlo) y con `/mcp` que el
    servidor `fabrica` está conectado.
@@ -87,7 +96,7 @@ manual: pide permiso antes de cada comando y explica qué va a hacer.
     Si cambia código, reinicia el vigilante.
 13. **Aprobar**: mover el vídeo a mano de `data/revision/` a `data/listos/`.
 14. **Guardar el trabajo**: pedir a Claude el commit y el push (siempre pregunta antes).
-15. **Al terminar**: `docker kill --signal=SIGINT vigilante` y `colima stop`.
+15. **Al terminar**: `./apagar.sh`.
 
 ## Estructura del proyecto
 

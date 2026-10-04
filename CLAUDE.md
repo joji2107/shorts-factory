@@ -13,6 +13,9 @@ Todo el proyecto está en español: código, nombres de variables, comentarios, 
 Todo se ejecuta dentro del contenedor `shorts-whisper` (Colima en un Mac M2 con 8 GB; la VM tiene 2 CPU y 3 GB), con el proyecto montado en `/proyecto`:
 
 ```bash
+./arrancar.sh    # en el Mac: Colima + vigilante si no están en marcha, y estado (repetible)
+./apagar.sh      # en el Mac: se niega con audios en la bandeja o un short en marcha (último INICIO
+                 # del registro sin OK/ERROR: un SIGINT a mitad lo cortaría); SIGINT y colima stop
 colima start
 docker build -t shorts-ffmpeg .                              # base: Ubuntu + FFmpeg + fuentes
 docker build -f Dockerfile.whisper -t shorts-whisper .       # FROM shorts-ffmpeg + Python + faster-whisper
