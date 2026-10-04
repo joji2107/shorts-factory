@@ -1,0 +1,43 @@
+{
+  "version_fabrica": "1.0",
+  "voz": {
+    "inicio": "auto",
+    "umbral_silencio": "-40dB",
+    "margen_inicio": 0.15
+  },
+  "musica": {
+    "archivo": "data/biblioteca/musica/misterio_03.mp3"
+  },
+  "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ],
+    "lista": [
+      {
+        "archivo": "data/biblioteca/sfx/whoosh_01.mp3",
+        "palabra": "frío"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/riser_01.mp3",
+        "palabra": "curioso"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/ding_01.mp3",
+        "palabra": "medio"
+      }
+    ]
+  },
+  "audio_original": "data/archivo/010-lluvia_cataluna.wav",
+  "video": {
+    "clips": [
+      "lluvia_cataluña-001",
+      "lluvia_cataluña-005",
+      "lluvia-cataluña-002",
+      "lluvia_cataluña-006",
+      "lluvia_cataluña-004",
+      "lluvia_cataluña-003"
+    ]
+  }
+}

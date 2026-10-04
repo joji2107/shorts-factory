@@ -1,0 +1,14 @@
+caribe_06 3.547 3.3193
+caribe_08 1.0 2.3
+caribe_05 1.0 3.0
+caribe_08 4.0 2.2
+caribe_05 8.8 2.5
+caribe_08 9.967 3.6
+caribe_07 25.167 3.3
+caribe_05 4.2 3.2
+caribe_08 14.0 1.6
+caribe_05 12.5 3.5
+caribe_08 18.5 4.9
+caribe_06 7.367 3.2
+caribe_05 8.8 3.9
+caribe_08 20.5 3.4667

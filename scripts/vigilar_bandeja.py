@@ -12,6 +12,7 @@ Flujo:
 Todo queda anotado en data/registro.log.
 """
 import argparse
+import difflib
 import json
 import shutil
 import time
@@ -21,8 +22,8 @@ from pathlib import Path
 
 import lectura
 import material
-from crear_short import RAIZ, crear, fusionar
-from pasos.utilidades import duracion
+from pasos.marcas import planos_del_guion
+from crear_short import RAIZ, config_base, crear, fusionar
 
 DATA = RAIZ / "data"
 BANDEJA = DATA / "bandeja"
@@ -31,6 +32,7 @@ ERRORES = DATA / "errores"
 REVISION = DATA / "revision"
 REGISTRO = DATA / "registro.log"
 EXTENSIONES = {".wav", ".mp3", ".m4a", ".aif", ".aiff"}
+PARECIDO_NOMBRE = 0.8      # parecido mínimo (de 0 a 1) para sugerir un nombre ante una errata
 
 
 def registrar(mensaje):
@@ -47,6 +49,29 @@ def esta_completo(archivo, espera=3):
     tamano = archivo.stat().st_size
     time.sleep(espera)
     return tamano > 0 and archivo.stat().st_size == tamano
+
+
+def sugerencia(nombre, tema):
+    """Si el nombre de la grabación parece una errata ("008-oriondas"), el nombre que
+    seguramente se quería: primero entre las recetas reservadas (con guion y sin
+    grabación todavía) y, si no, entre los temas del índice. No renombra nada: adivinar
+    mal sería peor que avisar."""
+    reservadas = []
+    for receta in (RAIZ / "shorts").glob("[0-9][0-9][0-9]-*"):
+        ruta = receta / "config.json"
+        if (receta / "guion.md").exists() and ruta.exists() \
+                and "audio_original" not in json.loads(ruta.read_text(encoding="utf-8")):
+            reservadas.append(receta.name)
+    parecida = difflib.get_close_matches(nombre, reservadas, n=1, cutoff=PARECIDO_NOMBRE)
+    if parecida:
+        return (f". ¿Querías decir {parecida[0]}? Renombra la grabación de data/errores/ "
+                f"y déjala otra vez en la bandeja")
+    temas = {e for fila in material.leer_indice() if fila["tipo"].strip() == "video"
+             for e in fila["etiquetas"].strip().split(";") if e}
+    parecido = difflib.get_close_matches(tema, sorted(temas), n=1, cutoff=PARECIDO_NOMBRE)
+    if parecido:
+        return f". ¿Querías decir el tema '{parecido[0]}'?"
+    return ""
 
 
 def preparar_receta(nombre, audio, plantilla):
@@ -67,13 +92,16 @@ def preparar_receta(nombre, audio, plantilla):
         config = config_plantilla
 
     config["audio_original"] = str(audio.relative_to(RAIZ))
+    # La receta guarda con qué versión de la fábrica se hizo (la reservada ya la trae de la skill)
+    config.setdefault("version_fabrica", config_base()["version_fabrica"])
 
     # Los clips se eligen después de la voz, con la duración real (despues_de_voz).
     # Aquí solo se comprueba que el tema tenga alguno, para fallar antes de procesar.
     tema = nombre.split("-", 1)[-1]              # "002-caballo" -> "caballo"
     tiene_clips = config.get("video", {}).get("clips")
     if not tiene_clips and not (receta / "cortes.txt").exists() and not material.clips_del_tema(tema):
-        raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv")
+        raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv"
+                           + sugerencia(nombre, tema))
 
     receta.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -92,8 +120,19 @@ def material_despues_de_voz(nombre):
             return                               # cortes a mano: no hay nada que elegir
         tema = nombre.split("-", 1)[-1]
         clips = config["video"]["clips"]
+        # Con ritmo (fábrica 2.0), los planos protagonistas del guion ya tienen su clip:
+        # los clips de la receta son el relleno del resto del tiempo
+        protagonistas = []
+        if config["video"]["ritmo"]["activo"]:
+            planos = planos_del_guion(receta / "guion.md")
+            protagonistas = sorted({clip for _, clip, _, _, _ in planos})
+            total = max(0.0, total - sum(largo for _, _, _, largo, _ in planos))
+            if planos:
+                registrar(f"       {len(planos)} planos protagonistas ({', '.join(protagonistas)}): "
+                          f"quedan {total:.1f} s de relleno")
+            clips = [clip for clip in clips if clip not in protagonistas]
         if not clips:
-            clips, estado = material.elegir_clips(tema, total, config)
+            clips, estado = material.elegir_clips(tema, total, config, protagonistas=protagonistas)
             config["video"]["clips"] = clips
             ruta = receta / "config.json"
             propia = json.loads(ruta.read_text(encoding="utf-8"))
@@ -112,10 +151,12 @@ def material_despues_de_voz(nombre):
 
 
 def anotar_lectura(nombre):
-    """Añade la velocidad de lectura de esta grabación a config/lectura.json."""
+    """Añade la velocidad de lectura de esta grabación a config/lectura.json. Se mide de
+    la primera palabra a la última: el silencio o el ruido grabados después no cuentan."""
     trabajo = DATA / "shorts" / nombre
-    palabras = len(json.loads((trabajo / "palabras.json").read_text(encoding="utf-8")))
-    segundos = duracion(trabajo / "voz.wav")
+    transcritas = json.loads((trabajo / "palabras.json").read_text(encoding="utf-8"))
+    palabras = len(transcritas)
+    segundos = transcritas[-1]["fin"] - transcritas[0]["inicio"]
     esta, media = lectura.anadir_muestra(nombre, palabras, segundos)
     registrar(f"       Lectura: {palabras} palabras en {segundos:.1f} s ({esta:.2f} por segundo); "
               f"velocidad de referencia: {media:.2f}")

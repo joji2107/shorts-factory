@@ -1,8 +1,17 @@
 {
-  "palabras_por_segundo": 2.65,
+  "palabras_por_segundo": 3.0,
   "ultimas_muestras": 5,
   "muestras": [
-    {"short": "001-pulpo", "palabras": 108, "segundos": 42.55},
-    {"short": "002-caballo", "palabras": 115, "segundos": 41.61}
+    {"short": "001-pulpo", "palabras": 108, "segundos": 40.48},
+    {"short": "002-caballo", "palabras": 115, "segundos": 40.38},
+    {"short": "003-rayo", "palabras": 109, "segundos": 36.78},
+    {"short": "004-elefante", "palabras": 120, "segundos": 45.32},
+    {"short": "005-caribe", "palabras": 121, "segundos": 41.74},
+    {"short": "006-columna", "palabras": 116, "segundos": 38.76},
+    {"short": "007-cambio_hora", "palabras": 115, "segundos": 37.76},
+    {"short": "008-orionidas", "palabras": 120, "segundos": 35.42},
+    {"short": "009-nudillos", "palabras": 119, "segundos": 39.64},
+    {"short": "010-lluvia_cataluna", "palabras": 118, "segundos": 45.34},
+    {"short": "011-volcan", "palabras": 102, "segundos": 37.66}
   ]
 }

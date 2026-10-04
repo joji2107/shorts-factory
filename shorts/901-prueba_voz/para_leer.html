@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Para leer: 901-prueba_voz</title>
+<style>
+  :root { --texto: #1d1d1f; --suave: #8a8a8e; --fondo: #fbfaf7; --marca: #b4533a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --texto: #f2f2f2; --suave: #9a9aa0; --fondo: #161618; --marca: #f08a6c; }
+  }
+  body { background: var(--fondo); color: var(--texto); margin: 0;
+         font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+  .aviso { color: var(--suave); font-size: 15px; line-height: 1.5;
+           border-bottom: 1px solid color-mix(in srgb, var(--suave) 35%, transparent);
+           padding-bottom: 18px; margin-bottom: 28px; }
+  .aviso code { font-size: 14px; }
+  .nota { color: var(--texto); }
+  h2 { color: var(--suave); font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+       font-weight: 600; margin: 34px 0 6px; }
+  p { font-size: 30px; line-height: 1.55; margin: 0 0 14px; }
+  strong { color: var(--marca); }
+  .pausa { color: var(--suave); font-size: 20px; font-style: italic; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <div class="aviso">
+    <strong>901-prueba_voz</strong>: 59 palabras, unos 20 segundos.<br>
+    <strong>No va a la bandeja.</strong> Graba 3 tomas, cada una con <strong>4 segundos de silencio</strong> antes de empezar a hablar, y guárdalas en <code>data/pruebas/voz/</code>: <code>toma_actual.wav</code> (como grabas ahora), <code>toma_manta.wav</code> (con mantas detrás y alrededor del micro) y <code>toma_cerca.wav</code> (con el micro a 10-15 cm).<br>
+    <strong>Negrita</strong> = énfasis · <span class="pausa">(pausa)</span> = respira, no se lee.
+    Lee a tu ritmo: la duración la marca tu voz.
+    <br><span class="nota">Lee igual en las tres tomas: mismo tono, misma distancia (salvo en la toma cerca) y mismo volumen. Las frases con eses y con p, b y t son para oír silbidos y golpes de aire: no las suavices. El final, con énfasis de verdad.</span>
+  </div>
+
+  <h2>Gancho</h2>
+  <p><strong>Seis sopas sosas</strong> se sirven sin sal. <span class="pausa">(pausa)</span><br>
+  Pedro pidió pan, pero Pablo prefirió patatas.</p>
+
+  <h2>Dato</h2>
+  <p><strong>Besos, bebés y botas</strong> bajo la brisa.<br>
+  Tres tristes tigres tragaban trigo en un trigal. <span class="pausa">(pausa)</span></p>
+
+  <h2>Giro</h2>
+  <p>Y esto es lo <strong>importante</strong>: si suena bien aquí, sonará bien <strong>siempre</strong>.</p>
+
+  <h2>Remate</h2>
+  <p>Pasa, siéntate y escucha despacio.<br>
+  Así sonaré en los próximos vídeos: más clara, más cercana y sin silbidos.</p>
+</main>
+</body>
+</html>

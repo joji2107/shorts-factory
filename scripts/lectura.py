@@ -3,7 +3,7 @@
 Sirve para estimar la duración de un guion antes de grabarlo (la skill guion-short
 la usa para evaluar_material). Se guarda en config/lectura.json y se afina sola:
 el vigilante añade una muestra por cada short terminado (palabras transcritas y
-segundos de voz.wav, pausas incluidas) y la velocidad pasa a ser la mediana de las
+segundos de la primera a la última palabra, pausas incluidas; lo grabado después no cuenta) y la velocidad pasa a ser la mediana de las
 últimas muestras. La mediana evita que una grabación rara desvíe la estimación.
 """
 import json

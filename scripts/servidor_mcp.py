@@ -24,6 +24,7 @@ from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 
 import material
+import metricas
 
 RAIZ = Path(__file__).resolve().parent.parent
 DATA = RAIZ / "data"
@@ -66,10 +67,10 @@ def _filas_indice():
 
 
 def _temas():
-    """Cuenta cuántos vídeos hay de cada etiqueta."""
+    """Cuenta cuántos vídeos utilizables hay de cada etiqueta (sin los descartados)."""
     contador = Counter()
     for fila in _filas_indice():
-        if fila["tipo"].strip() == "video":
+        if fila["tipo"].strip() == "video" and not material.descartado(fila):
             contador.update(e for e in fila["etiquetas"].strip().split(";") if e)
     return contador
 
@@ -177,21 +178,32 @@ def _pedir_pixabay(clave, parametros):
     raise ErrorFuente(problema)
 
 
-def _buscar_pixabay(clave, busqueda, pagina):
-    """Una página de resultados de Pixabay en el formato común, y si quedan más páginas."""
+def _buscar_pixabay(clave, busqueda, pagina, id_video=None):
+    """Una página de resultados de Pixabay en el formato común, y si quedan más páginas.
+    Con id_video, solo ese vídeo. "ia": Pixabay lo marca como generado con IA (el campo
+    isAiGenerated no sale en su documentación) o lo dice en sus etiquetas; no es infalible."""
     por_pagina = 50
-    parametros = {"q": busqueda, "safesearch": "true", "per_page": por_pagina, "page": pagina}
+    if id_video:
+        parametros = {"id": id_video}
+    else:
+        parametros = {"q": busqueda, "safesearch": "true", "per_page": por_pagina, "page": pagina}
     datos = _con_cache("pixabay", parametros, lambda: _pedir_pixabay(clave, parametros))
     videos = []
     for video in datos.get("hits", []):
+        tamanos = video.get("videos") or {}
         versiones = [{"link": v.get("url"), "width": v.get("width"), "height": v.get("height")}
-                     for v in (video.get("videos") or {}).values()]
-        videos.append({"url": video.get("pageURL") or "", "autor": video.get("user") or "desconocido",
-                       "duracion": video.get("duration") or 0, "versiones": versiones})
+                     for v in tamanos.values()]
+        etiquetas = (video.get("tags") or "").lower()
+        miniatura = next((tamanos[t].get("thumbnail") for t in ("small", "tiny", "medium")
+                          if tamanos.get(t, {}).get("thumbnail")), None)
+        videos.append({"id": str(video.get("id") or ""), "url": video.get("pageURL") or "",
+                       "autor": video.get("user") or "desconocido", "duracion": video.get("duration") or 0,
+                       "versiones": versiones, "etiquetas": etiquetas, "miniatura": miniatura,
+                       "ia": bool(video.get("isAiGenerated")) or "ai generated" in etiquetas})
     return videos, pagina * por_pagina < datos.get("totalHits", 0)
 
 
-# Para añadir Pexels: escribir _buscar_pexels(clave, busqueda, pagina) con el mismo
+# Para añadir Pexels: escribir _buscar_pexels(clave, busqueda, pagina, id_video=None) con el mismo
 # formato de salida, añadirla aquí y cambiar FUENTE.
 FUENTES = {
     "pixabay": {"buscar": _buscar_pixabay, "variable": "PIXABAY_API_KEY", "nombre": "Pixabay",
@@ -210,6 +222,58 @@ def _elegir_archivo(versiones):
     if candidatos:
         return max(candidatos, key=lambda v: v["width"] * v["height"])
     return None
+
+
+def _palabra_clave(busqueda):
+    """La primera palabra de la búsqueda: tiene que estar en las etiquetas del vídeo."""
+    return busqueda.lower().split()[0]
+
+
+def _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantidad, orientacion="todas", ids=()):
+    """Los vídeos que se pueden descargar, en orden de preferencia: primero los que no son
+    IA y, entre ellos, los verticales (los horizontales sirven por el fondo desenfocado).
+    Pixabay devuelve también vídeos que solo se parecen a la búsqueda (piedras o cielos
+    estrellados al buscar rayos), así que se exige la palabra clave en sus etiquetas.
+    Con ids, solo esos vídeos y en ese orden (los ha elegido alguien viendo ver_candidatos)."""
+    candidatos = []
+
+    def considerar(video, mirar_etiquetas):
+        url = video["url"].strip().rstrip("/")
+        archivo = _elegir_archivo(video["versiones"])
+        vertical = archivo is not None and archivo["height"] > archivo["width"]
+        if video["duracion"] < 6:
+            saltados["duran menos de 6 s"] += 1
+        elif not url or url in ya_registradas:
+            saltados["ya estaban en el índice"] += 1
+        elif mirar_etiquetas and _palabra_clave(busqueda) not in video["etiquetas"]:
+            saltados[f"no tienen '{_palabra_clave(busqueda)}' en sus etiquetas"] += 1
+        elif archivo is None:
+            saltados["sin archivo descargable"] += 1
+        elif orientacion != "todas" and vertical != (orientacion == "vertical"):
+            saltados[f"no son {orientacion}es"] += 1
+        else:
+            ya_registradas.add(url)                     # tampoco se repite entre páginas
+            candidatos.append((video, archivo))
+
+    if ids:
+        for id_video in ids:
+            videos, _ = fuente["buscar"](clave, busqueda, 1, id_video)
+            if not videos:
+                saltados["ids que no existen"] += 1
+            for video in videos:
+                considerar(video, mirar_etiquetas=False)
+        return candidatos
+
+    # Como mucho 3 páginas, que además quedan en caché 24 horas
+    for pagina in range(1, 4):
+        videos, hay_mas = fuente["buscar"](clave, busqueda, pagina)
+        for video in videos:
+            considerar(video, mirar_etiquetas=True)
+        if sum(not video["ia"] for video, _ in candidatos) >= cantidad or not hay_mas:
+            break
+    # sort estable: dentro de cada grupo se mantiene el orden de Pixabay
+    candidatos.sort(key=lambda c: (c[0]["ia"], c[1]["height"] <= c[1]["width"]))
+    return candidatos
 
 
 def _siguiente_clip(tema, filas):
@@ -250,11 +314,22 @@ def _anadir_al_indice(fila):
 @servidor.tool()
 def estado_fabrica(lineas_registro: int = 15) -> str:
     """Resumen de la fábrica: qué hay en la bandeja, en revisión, listo para publicar
-    y con errores, y las últimas líneas del registro del vigilante."""
+    y con errores, qué está publicado, qué medidas de métricas tocan (48h o 7d) y las
+    últimas líneas del registro del vigilante."""
+    publicados = sorted({p["short"] for p in metricas.leer_publicaciones()})
+    medidas = metricas.pendientes()
+    ahora = [m for m in medidas if m["estado"] == "pendiente"]
+    proximas = [m for m in medidas if m["estado"] == "próxima"][:3]
     partes = [
         f"Bandeja (pendientes): {_nombres(BANDEJA) or 'vacía'}",
         f"En revisión: {_nombres(DATA / 'revision', '*.mp4') or 'ninguno'}",
-        f"Listos para publicar: {_nombres(DATA / 'listos', '*.mp4') or 'ninguno'}",
+        f"Listos (aprobados): {_nombres(DATA / 'listos', '*.mp4') or 'ninguno'}",
+        f"Publicados: {_contar(len(publicados), 'short')} ({', '.join(publicados) or 'ninguno'})",
+        "Medidas pendientes ahora: " + (", ".join(
+            f"{m['short']} {m['plataforma']} {m['momento']}" for m in ahora) or "ninguna"),
+        "Próximas medidas: " + (", ".join(
+            f"{m['short']} {m['plataforma']} {m['momento']} ({m['cuando']:%Y-%m-%d %H:%M})"
+            for m in proximas) or "ninguna"),
         f"Con errores: {_nombres(DATA / 'errores', '*.log') or 'ninguno'}",
         f"Grabaciones disponibles en data/entrada: {_nombres(ENTRADA) or 'ninguna'}",
     ]
@@ -273,14 +348,21 @@ def temas_disponibles() -> dict[str, int]:
 
 
 @servidor.tool()
-def evaluar_material(tema: str, duracion_segundos: float = 45) -> str:
+def evaluar_material(tema: str, duracion_segundos: float = 45, version: str = "") -> str:
     """Dice si hay clips suficientes de un tema para un short de esa duración sin repetir
     planos, cuántas veces se ha usado cada clip y, si falta material, cuántos clips más
-    hacen falta. Úsala antes de preparar_short y de buscar_clips."""
+    hacen falta. Úsala antes de preparar_short y de buscar_clips.
+    duracion_segundos: lo que dura la voz, sin la cola del final (se suma aquí).
+    version: la de la fábrica del short ('2.0'); vacío, la por defecto. En la 2.0 el
+    relleno se corta más rápido (hacen falta más clips): pasa como duración la voz + los
+    respiros − los planos protagonistas, que no son relleno."""
     tema = tema.strip().lower()
-    if not 10 <= duracion_segundos <= 180:
-        return "La duración tiene que estar entre 10 y 180 segundos."
-    config = material.configuracion()
+    if not 5 <= duracion_segundos <= 180:
+        return "La duración tiene que estar entre 5 y 180 segundos."
+    try:
+        config = material.configuracion(version=version.strip() or None)
+    except RuntimeError as e:
+        return str(e)
     video = config["video"]
     total = duracion_segundos + config["final"]["cola"]
     try:
@@ -326,19 +408,39 @@ def evaluar_material(tema: str, duracion_segundos: float = 45) -> str:
 
 @servidor.tool()
 def listar_shorts() -> list[dict]:
-    """Los shorts que tienen receta en shorts/ y en qué estado está su vídeo."""
+    """Los shorts que tienen receta en shorts/, con qué versión de la fábrica se hacen
+    (version_fabrica de la receta, o la por defecto si no la dice), en qué estado está su vídeo, dónde y
+    cuándo se ha publicado (de shorts/publicaciones.csv) y qué medidas de métricas le
+    faltan: 'pendiente' si ya toca, 'próxima' con la fecha si todavía no."""
+    publicaciones = metricas.leer_publicaciones()
+    medidas = metricas.pendientes()
     resultado = []
     for receta in sorted(p for p in (RAIZ / "shorts").iterdir() if p.is_dir()):
         nombre = receta.name
-        if (DATA / "listos" / f"{nombre}.mp4").exists():
+        publicado = {p["plataforma"]: p["publicado"] for p in publicaciones if p["short"] == nombre}
+        if publicado:
+            estado = "publicado"
+        elif any((DATA / "listos").glob(f"{nombre}*.mp4")):
             estado = "listo para publicar"
         elif (DATA / "revision" / f"{nombre}.mp4").exists():
             estado = "pendiente de revisión"
         elif (DATA / "errores" / f"{nombre}.log").exists():
             estado = "con error"
         else:
-            estado = "sin vídeo (publicado o pendiente de procesar)"
-        resultado.append({"short": nombre, "estado": estado})
+            estado = "sin vídeo (reservado o pendiente de procesar)"
+        try:
+            version = metricas.cargar_config(nombre)["version_fabrica"]
+        except RuntimeError as error:
+            version = f"error: {error}"
+        ficha = {"short": nombre, "version_fabrica": version, "estado": estado}
+        if publicado:
+            ficha["publicado"] = publicado
+            ficha["medidas_pendientes"] = [
+                f"{m['plataforma']} {m['momento']}: " + (
+                    "ya toca" if m["estado"] == "pendiente" else f"el {m['cuando']:%Y-%m-%d %H:%M}")
+                for m in medidas if m["short"] == nombre
+            ]
+        resultado.append(ficha)
     return resultado
 
 
@@ -383,21 +485,82 @@ def preparar_short(grabacion: str, tema: str, short: str = "") -> str:
 
 
 @servidor.tool()
-def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, etiquetas_generales: str = "") -> str:
-    """Busca vídeos de 6 segundos o más en Pixabay (primero los verticales), los descarga
-    a la biblioteca como <tema>_NN.mp4 y los registra en biblioteca/indice.csv con su licencia.
-    La búsqueda va en inglés (por ejemplo, tema 'caballo' y búsqueda 'horse'). Máximo 5 clips.
+def ver_candidatos(busqueda_en_ingles: str, cantidad: int = 8, orientacion: str = "todas") -> str:
+    """Enseña los vídeos de Pixabay que buscar_clips descargaría, SIN descargarlos a la
+    biblioteca: id, orientación, duración, si Pixabay lo marca como IA, sus etiquetas y su
+    miniatura (guardada en data/cache/miniaturas/ para verla). Sirve para elegir los que
+    de verdad muestran el tema y pasar sus ids a buscar_clips. La primera palabra de la
+    búsqueda tiene que estar en las etiquetas del vídeo. orientacion: 'todas', 'vertical'
+    u 'horizontal' (lo grabado de verdad suele ser horizontal; queda bien por el fondo
+    desenfocado). Como mucho 12 candidatos."""
+    busqueda = busqueda_en_ingles.strip()
+    if not busqueda:
+        return "Falta la búsqueda en inglés (por ejemplo, 'lightning')."
+    if orientacion not in ("todas", "vertical", "horizontal"):
+        return "orientacion tiene que ser 'todas', 'vertical' u 'horizontal'."
+    cantidad = max(1, min(cantidad, 12))
+    fuente = FUENTES[FUENTE]
+    clave = _clave(fuente["variable"])
+    if not clave:
+        return f"Falta la clave de {fuente['nombre']} en .env ({fuente['variable']}=...)."
+
+    ya_registradas = {fila["url"].strip().rstrip("/") for fila in _filas_indice()}
+    saltados = Counter()
+    try:
+        candidatos = _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantidad, orientacion)
+    except ErrorFuente as e:
+        return f"No se ha podido buscar: {e}"
+
+    carpeta = CACHE / "miniaturas"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    lineas = []
+    for video, archivo in candidatos[:cantidad]:
+        miniatura = carpeta / f"{FUENTE}_{video['id']}.jpg"
+        if video["miniatura"] and not miniatura.exists():
+            try:                                     # la miniatura no lleva la clave en la url
+                peticion = urllib.request.Request(video["miniatura"], headers={"User-Agent": AGENTE})
+                with urllib.request.urlopen(peticion, timeout=20) as respuesta:
+                    miniatura.write_bytes(respuesta.read())
+            except (urllib.error.URLError, TimeoutError, OSError):
+                pass
+        forma = "vertical" if archivo["height"] > archivo["width"] else "horizontal"
+        lineas.append(f"{video['id']}: {forma} {archivo['width']}x{archivo['height']}, {video['duracion']} s"
+                      f"{', IA' if video['ia'] else ''}, de {video['autor']} | {video['etiquetas']}"
+                      + (f" | {miniatura.relative_to(RAIZ)}" if miniatura.exists() else ""))
+    partes = [f"Candidatos de '{busqueda}' ({len(lineas)}, primero los que no son IA):"] + (lineas or ["(ninguno)"])
+    if saltados:
+        partes.append("Descartados: " + ", ".join(f"{n} {motivo}" for motivo, n in saltados.items()))
+    partes.append("Para descargar los elegidos: buscar_clips(tema, ids='id1,id2'). "
+                  "La marca de IA de Pixabay no es infalible: mira las miniaturas.")
+    return "\n".join(partes)
+
+
+@servidor.tool()
+def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, etiquetas_generales: str = "",
+                 ids: str = "") -> str:
+    """Descarga vídeos de Pixabay a la biblioteca como <tema>_NN.mp4 y los registra en
+    biblioteca/indice.csv con su licencia. Máximo 5 clips.
+    Lo mejor es mirar antes ver_candidatos y pasar aquí los ids elegidos ('123,456'): así
+    se descarga solo lo que se ha visto que sirve. Sin ids, busca (en inglés: tema 'caballo',
+    búsqueda 'horse'; la primera palabra tiene que estar en las etiquetas del vídeo) y se
+    queda con los primeros de 6 s o más, primero los que no son IA y después los verticales.
     Antes, usa evaluar_material para saber cuántos clips faltan y pide solo esos.
     etiquetas_generales: una o dos categorías más amplias que el tema, en singular, sin
     tildes y separadas por punto y coma (caballo -> 'animal'; pulpo -> 'animal;mar').
-    Si el tema ya existe y no se indican, se usan las que ya tiene.
+    Si el tema ya existe y no se indican, se usan las que ya tiene. Los vídeos que Pixabay
+    marca como IA se registran además con la etiqueta 'ia'.
     No vuelve a descargar vídeos que ya estén en el índice."""
     tema = tema.strip().lower()
     busqueda = busqueda_en_ingles.strip()
+    lista_ids = [i.strip() for i in ids.split(",") if i.strip()]
     if not re.fullmatch(r"[a-z0-9_]+", tema):
         return "El tema solo puede tener minúsculas sin tildes, números y guiones bajos."
-    if not busqueda:
-        return "Falta la búsqueda en inglés (por ejemplo, 'horse' para el tema 'caballo')."
+    if any(not i.isdigit() for i in lista_ids):
+        return "Los ids son los números de ver_candidatos, separados por comas ('123,456')."
+    if lista_ids:
+        cantidad = len(lista_ids)
+    elif not busqueda:
+        return "Falta la búsqueda en inglés (por ejemplo, 'horse' para el tema 'caballo') o los ids."
     if not 1 <= cantidad <= MAX_CLIPS:
         return f"La cantidad tiene que estar entre 1 y {MAX_CLIPS} (no se permiten descargas masivas)."
 
@@ -425,30 +588,12 @@ def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, etiqueta
     saltados = Counter()
     problema = None
 
-    # 1. Reunir candidatos (como mucho 3 páginas, que además quedan en caché 24 horas)
+    # 1. Reunir candidatos, en orden de preferencia
     candidatos = []
     try:
-        for pagina in range(1, 4):
-            videos, hay_mas = fuente["buscar"](clave, busqueda, pagina)
-            for video in videos:
-                url = video["url"].strip().rstrip("/")
-                if video["duracion"] < 6:
-                    saltados["duran menos de 6 s"] += 1
-                elif not url or url in ya_registradas:
-                    saltados["ya estaban en el índice"] += 1
-                elif (archivo := _elegir_archivo(video["versiones"])) is None:
-                    saltados["sin archivo descargable"] += 1
-                else:
-                    ya_registradas.add(url)                     # tampoco se repite entre páginas
-                    candidatos.append((video, archivo))
-            verticales = sum(a["height"] > a["width"] for _, a in candidatos)
-            if verticales >= cantidad or not hay_mas:
-                break
+        candidatos = _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantidad, ids=lista_ids)
     except ErrorFuente as e:
         problema = str(e)
-
-    # 2. Primero los verticales; los horizontales sirven gracias al fondo desenfocado
-    candidatos.sort(key=lambda c: c[1]["height"] <= c[1]["width"])   # sort estable: no cambia el orden de Pixabay
 
     # 3. Descargar y registrar uno a uno: lo que ya se ha bajado queda registrado aunque luego falle algo
     VIDEOS.mkdir(parents=True, exist_ok=True)
@@ -459,10 +604,11 @@ def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, etiqueta
             destino = VIDEOS / f"{tema}_{numero:02d}.mp4"
             _descargar(archivo["link"], destino)
             _anadir_al_indice([destino.name, "video", fuente["nombre"], video["autor"], video["url"],
-                               fuente["licencia"], date.today().isoformat(), etiquetas])
+                               fuente["licencia"], date.today().isoformat(),
+                               etiquetas + (";ia" if video["ia"] else "")])
             forma = "vertical" if archivo["height"] > archivo["width"] else "horizontal"
             anadidos.append(f"{destino.name}: {archivo['width']}x{archivo['height']} {forma}, "
-                            f"{video['duracion']} s, de {video['autor']} ({video['url']})")
+                            f"{video['duracion']} s{', IA' if video['ia'] else ''}, de {video['autor']} ({video['url']})")
             numero += 1
     except ErrorFuente as e:
         problema = str(e)
@@ -471,7 +617,7 @@ def buscar_clips(tema: str, busqueda_en_ingles: str, cantidad: int = 4, etiqueta
     if anadidos:
         partes.append(f"Clips añadidos ({len(anadidos)} de {cantidad}):\n" + "\n".join(anadidos))
     else:
-        partes.append(f"No se ha añadido ningún clip de '{busqueda}'.")
+        partes.append(f"No se ha añadido ningún clip de '{busqueda or ids}'.")
     if saltados:
         partes.append("Vídeos saltados: " + ", ".join(f"{n} {motivo}" for motivo, n in saltados.items()))
     if problema:

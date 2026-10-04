@@ -19,13 +19,14 @@ import statistics
 from collections import Counter
 from pathlib import Path
 
-from crear_short import RAIZ, fusionar
+from crear_short import RAIZ, config_base, fusionar
 from pasos.cortes import repartir
 from pasos.utilidades import duracion
 
 INDICE = RAIZ / "biblioteca" / "indice.csv"
 VIDEOS = RAIZ / "data" / "biblioteca" / "video"
 MIN_CLIPS = 6
+DESCARTADO = "descartado"
 
 
 def leer_indice():
@@ -42,20 +43,35 @@ def leer_indice():
     return filas
 
 
+def descartado(fila):
+    """Un clip con la etiqueta 'descartado' no se elige nunca (no muestra el tema, por
+    ejemplo). Sigue en el índice: la biblioteca no se borra y así no se vuelve a descargar."""
+    return DESCARTADO in fila["etiquetas"].strip().split(";")
+
+
 def clips_del_tema(tema, filas=None):
-    """Los vídeos del índice con esa etiqueta (nombre sin extensión)."""
+    """Los vídeos del índice con esa etiqueta (nombre sin extensión), sin los descartados."""
     return [
         Path(fila["archivo"]).stem
         for fila in (filas if filas is not None else leer_indice())
         if fila["tipo"].strip() == "video" and tema in fila["etiquetas"].strip().split(";")
+        and not descartado(fila)
     ]
 
 
-def configuracion(plantilla="curiosidades"):
-    """La configuración que tendrá un short nuevo: por defecto + plantilla."""
-    base = json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8"))
+def clips_ia(filas=None):
+    """Los vídeos del índice con la etiqueta 'ia' (generados con inteligencia artificial)."""
+    return {
+        Path(fila["archivo"]).stem
+        for fila in (filas if filas is not None else leer_indice())
+        if "ia" in fila["etiquetas"].strip().split(";")
+    }
+
+
+def configuracion(plantilla="curiosidades", version=None):
+    """La configuración que tendrá un short nuevo: por defecto + versión + plantilla."""
     ruta = RAIZ / "config" / "plantillas" / f"{plantilla}.json"
-    return fusionar(base, json.loads(ruta.read_text(encoding="utf-8")))
+    return fusionar(config_base(version), json.loads(ruta.read_text(encoding="utf-8")))
 
 
 def usos():
@@ -82,8 +98,14 @@ def duraciones(clips):
 
 
 def escenarios(total, video):
-    """Tres maneras de cortar el short: todo con cortes mínimos, medios o máximos."""
-    minimo, maximo = video["corte_min"], video["corte_max"]
+    """Tres maneras de cortar el short: todo con cortes mínimos, medios o máximos.
+    Con ritmo (fábrica 2.0), lo que se reparte es el relleno, con sus cortes rápidos;
+    'total' es entonces lo que no cubren los planos protagonistas."""
+    ritmo = video.get("ritmo", {})
+    if ritmo.get("activo"):
+        minimo, maximo = ritmo["relleno_min"], ritmo["relleno_max"]
+    else:
+        minimo, maximo = video["corte_min"], video["corte_max"]
     numeros = {
         "cortes cortos": int(total // minimo),                       # cada corte >= corte_min
         "cortes medios": max(1, round(total / ((minimo + maximo) / 2))),
@@ -119,14 +141,18 @@ def clips_que_faltan(durs, total, video):
     return None, tipica
 
 
-def elegir_clips(tema, total, config, azar=random):
-    """Los clips justos para el short, empezando por los menos usados (al azar entre
-    los empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos."""
-    candidatos = clips_del_tema(tema)
+def elegir_clips(tema, total, config, azar=random, protagonistas=()):
+    """Los clips justos para el short: primero los que no son IA (un short hecho solo
+    con clips de IA queda pobre) y, entre ellos, los menos usados (al azar entre los
+    empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos.
+    Los protagonistas (fábrica 2.0) no son relleno: no se eligen aquí."""
+    filas = leer_indice()
+    candidatos = [clip for clip in clips_del_tema(tema, filas) if clip not in protagonistas]
     if not candidatos:
         return [], "insuficiente"
     shorts, cortes = usos()
-    candidatos.sort(key=lambda clip: (shorts[clip], cortes[clip], azar.random()))
+    ia = clips_ia(filas)
+    candidatos.sort(key=lambda clip: (clip in ia, shorts[clip], cortes[clip], azar.random()))
     durs = duraciones(candidatos)
     for cuantos in range(min(MIN_CLIPS, len(candidatos)), len(candidatos) + 1):
         elegidos = candidatos[:cuantos]

@@ -1,0 +1,43 @@
+{
+  "version_fabrica": "1.0",
+  "voz": {
+    "inicio": "auto",
+    "umbral_silencio": "-40dB",
+    "margen_inicio": 0.15
+  },
+  "musica": {
+    "archivo": "data/biblioteca/musica/curiosidad_01.mp3"
+  },
+  "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ],
+    "lista": [
+      {
+        "archivo": "data/biblioteca/sfx/ding_01.mp3",
+        "palabra": "cuatro"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/riser_01.mp3",
+        "palabra": "curioso"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/whoosh_01.mp3",
+        "palabra": "raro"
+      }
+    ]
+  },
+  "audio_original": "data/archivo/004-elefante.wav",
+  "video": {
+    "clips": [
+      "elefante_03",
+      "elefante_06",
+      "elefante_07",
+      "elefante_04",
+      "elefante_01",
+      "elefante_02"
+    ]
+  }
+}

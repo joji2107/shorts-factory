@@ -1,0 +1,44 @@
+{
+  "version_fabrica": "1.0",
+  "voz": {
+    "inicio": "auto",
+    "umbral_silencio": "-40dB",
+    "margen_inicio": 0.15
+  },
+  "musica": {
+    "archivo": "data/biblioteca/musica/ciencia_01.mp3"
+  },
+  "efectos": {
+    "automaticos": 3,
+    "archivos": [
+      "data/biblioteca/sfx/whoosh_01.mp3",
+      "data/biblioteca/sfx/whoosh_02.mp3"
+    ],
+    "lista": [
+      {
+        "archivo": "data/biblioteca/sfx/ding_01.mp3",
+        "palabra": "menos"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/riser_01.mp3",
+        "palabra": "curioso"
+      },
+      {
+        "archivo": "data/biblioteca/sfx/whoosh_01.mp3",
+        "palabra": "centímetros",
+        "vez": 2
+      }
+    ]
+  },
+  "audio_original": "data/archivo/006-columna.wav",
+  "video": {
+    "clips": [
+      "columna_01",
+      "columna_03",
+      "columna_04",
+      "columna_07",
+      "columna_05",
+      "columna_02"
+    ]
+  }
+}

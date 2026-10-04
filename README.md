@@ -17,21 +17,32 @@ FFmpeg, Python, Git, agentes de IA y documentación técnica.
 - [x] Fase 6: Montaje del short (clips, voz, música, efectos y subtítulos)
 - [x] Fase 7: Automatización con Python (pipeline completo y carpeta bandeja)
 - [x] Fase 8: Servidor MCP y Claude Code (agente, clips de Pixabay y guiones)
-- [ ] Fase 9: Estrategia de contenido y canales
+- [x] Fase 9: Estrategia de contenido y canales (textos de publicación, métricas)
+- [x] Fase 10: Fábrica 2.0 (promesa y recompensa, respiros, planos protagonistas, música con energía)
+- [ ] Fase 11: Megaproyectos y nuevas fuentes (Wikimedia Commons, NASA, fotos como clips)
 - [ ] Producción: publicar al menos 3 shorts por semana
 
-Shorts hechos: 2 (`shorts/001-pulpo` y `shorts/002-caballo`, este en revisión).
+Shorts hechos: 11 (de `shorts/001-pulpo` a `shorts/011-volcan`, el primero de la fábrica 2.0);
+publicados, 8 (de 001 a 008).
 
 ## Uso diario
 
-1. Arrancar Colima: `colima start`
-2. Arrancar el vigilante en segundo plano:
+```bash
+./arrancar.sh    # Colima + vigilante (si no están en marcha) y estado: Colima, vigilante, bandeja, Git
+./apagar.sh      # se niega si hay audios en la bandeja o un short procesándose; avisa de
+                 # cambios sin guardar en Git; para el vigilante con SIGINT y apaga Colima
+```
+
+Los dos se pueden ejecutar varias veces: lo que ya está en marcha (o parado) no se toca.
+Lo que hacen por dentro, por si hace falta a mano:
 
 ```bash
+colima start
 docker run -d --rm --name vigilante -v "$PWD:/proyecto" -e HF_HOME=/proyecto/data/modelos \
   shorts-whisper python /proyecto/scripts/vigilar_bandeja.py --plantilla curiosidades
 docker logs -f vigilante                  # ver lo que hace (Ctrl+C solo deja de mirar)
 docker kill --signal=SIGINT vigilante     # pararlo (también tras cambiar código, y volver a arrancarlo)
+colima stop
 ```
 
 3. Grabar la voz y soltarla en `data/bandeja/` con el nombre `NNN-tema.wav`
@@ -54,9 +65,10 @@ De encender el Mac a tener el short en revisión. Claude Code trabaja en modo
 manual: pide permiso antes de cada comando y explica qué va a hacer.
 
 1. **Abrir la terminal** en el proyecto: `cd ~/shorts-factory`.
-2. **Arrancar Colima**: `colima start`. Comprobar con `docker ps` que responde.
-3. **Arrancar el vigilante** en segundo plano (comando de "Uso diario", paso 2).
-   Al apagar el Mac se para, así que hay que arrancarlo cada vez.
+2. **Arrancar el sistema**: `./arrancar.sh` (Colima y el vigilante en segundo plano).
+   Al apagar el Mac se paran, así que hay que arrancarlo cada vez.
+3. **Mirar el estado** que enseña al final: Colima y vigilante en marcha, audios
+   en la bandeja, rama de Git y cambios sin guardar.
 4. **Abrir Claude Code**: `claude`. Comprobar en la barra de estado que pone
    `⏸ manual mode on` (si no, `Shift+Tab` hasta verlo) y con `/mcp` que el
    servidor `fabrica` está conectado.
@@ -87,7 +99,7 @@ manual: pide permiso antes de cada comando y explica qué va a hacer.
     Si cambia código, reinicia el vigilante.
 13. **Aprobar**: mover el vídeo a mano de `data/revision/` a `data/listos/`.
 14. **Guardar el trabajo**: pedir a Claude el commit y el push (siempre pregunta antes).
-15. **Al terminar**: `docker kill --signal=SIGINT vigilante` y `colima stop`.
+15. **Al terminar**: `./apagar.sh`.
 
 ## Estructura del proyecto
 
@@ -151,6 +163,8 @@ docker build -f Dockerfile.whisper -t shorts-whisper .
 | 6 | `docs/06-montaje.md` |
 | 7 | `docs/07-automatizacion.md` |
 | 8 | `docs/08-agente.md` |
+| 9 | `docs/09-contenido-y-canales.md` |
+| 10 | `docs/10-fabrica-2.md` |
 
 ## Entorno
 

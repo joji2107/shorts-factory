@@ -6,7 +6,9 @@ y después aplica la corrección exacta al montarlo con el vídeo.
 import json
 import re
 import shutil
+from pathlib import Path
 
+from .musica import inicio_musica, leer_energia, respiros_flojos
 from .utilidades import ejecutar, duracion
 
 FORMATO = "aformat=sample_rates=48000:channel_layouts=stereo"
@@ -55,9 +57,20 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c):
     shutil.rmtree(carpeta)
 
 
-def construir_grafo_audio(total, musica, efectos):
+def subida_en_respiros(subida_db, rampa, tramos):
+    """Filtro que sube la música subida_db en cada respiro (inicio, fin): empieza a subir
+    al callarse la voz y acaba de bajar justo cuando vuelve, con rampas de 'rampa' s."""
+    factor = 10 ** (subida_db / 20) - 1
+    envolventes = "+".join(f"min(clip((t-{a:.3f})/{rampa},0,1),clip(({b:.3f}-t)/{rampa},0,1))"
+                           for a, b in tramos)
+    return f"volume=eval=frame:volume='1+{factor:.4f}*({envolventes})'"
+
+
+def construir_grafo_audio(total, musica, efectos, subida=None):
     """Grafo de la mezcla de audio, sin normalizar. Entradas: 0 voz, 1 música (si hay),
-    y después los efectos. 'efectos' es una lista de (retraso_ms, volumen)."""
+    y después los efectos. 'efectos' es una lista de (retraso_ms, volumen).
+    subida (fábrica 2.0): (dB, rampa, [(inicio, fin)]) para subir la música en los respiros.
+    Sin subida, el grafo es exactamente el de siempre."""
     # La voz se alarga con silencio hasta el final: sidechaincompress termina cuando
     # termina su entrada más corta, y sin esto la música se cortaba al acabar la voz
     # (la cola y el fundido de salida se quedaban mudos).
@@ -72,6 +85,10 @@ def construir_grafo_audio(total, musica, efectos):
             f"ratio={musica['ratio_ducking']}:attack={musica['ataque_ducking']}:"
             f"release={musica['relajacion_ducking']}[musica_duck]",
         ]
+        if subida and subida[2]:
+            # En los respiros la voz calla, el ducking se suelta solo y además la música sube
+            partes[-1] = partes[-1].replace("[musica_duck]", "[musica_sin_subida]")
+            partes.append(f"[musica_sin_subida]{subida_en_respiros(*subida)}[musica_duck]")
         entradas, siguiente = ["[voz]", "[musica_duck]"], 2
     else:
         partes = [f"{voz}[voz]"]
@@ -111,13 +128,56 @@ def medir_volumen(archivo, objetivo):
     return leer_json_final(resultado.stderr)
 
 
-def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
-    """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos."""
-    total = duracion(voz) + config["final"]["cola"]
+def inicio_automatico(musica, respiros, total, raiz):
+    """musica.inicio "auto" (fábrica 2.0): el segundo de la canción desde el que empezar
+    para que su momento fuerte (biblioteca/musica.json) suene en la revelación, que es el
+    último respiro. Si no se puede (sin respiros, canción sin analizar o plana), desde 0."""
+    nombre = Path(musica["archivo"]).name
+    energia = leer_energia(raiz).get(nombre)
+    if not respiros:
+        print("   AVISO: música 'auto' sin respiros: no hay revelación con la que sincronizarla, empieza en 0")
+        return 0.0
+    if not energia:
+        print(f"   AVISO: {nombre} no está en biblioteca/musica.json (analizar_musica.py): empieza en 0")
+        return 0.0
+    if energia["plana"]:
+        print(f"   AVISO: {nombre} es plana (sin momento fuerte): empieza en 0")
+        return 0.0
+    revelacion = respiros[-1]["inicio"]
+    inicio, aviso = inicio_musica(energia["momento_fuerte"], revelacion, total, energia["duracion"])
+    if aviso:
+        print(f"   AVISO: {aviso}")
+    print(f"   música desde el segundo {inicio:g}: su momento fuerte ({energia['momento_fuerte']} s, "
+          f"+{energia['subida_db']:g} dB) en la revelación ({revelacion:.2f} s)")
+    return inicio
+
+
+def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_ultima_palabra=None,
+           respiros=()):
+    """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos.
+    fin_ultima_palabra: segundo en que acaba la última palabra (de la transcripción).
+    respiros: los de respiros.json (fábrica 2.0): la música sube en ellos."""
+    tras = config["final"].get("tras_ultima_palabra")
+    if fin_ultima_palabra is not None:
+        # El vídeo acaba la cola después de la última palabra, no al final de la grabación:
+        # lo que se grabe después (silencio, ruido al parar) se queda fuera. En un bucle,
+        # tras_ultima_palabra (0,5 s) para que enlace con la primera frase.
+        total = fin_ultima_palabra + (tras if tras is not None else config["final"]["cola"])
+    else:
+        total = duracion(voz) + config["final"]["cola"]
     if duracion(fondo) < total - 0.05:   # margen de un fotograma y poco más
         print("   AVISO: el fondo dura menos que la voz. Faltan cortes en la lista.")
 
-    musica = config["musica"] if config["musica"]["archivo"] else None
+    musica = dict(config["musica"]) if config["musica"]["archivo"] else None
+    if musica and fin_ultima_palabra is not None:
+        # El fundido de salida de la música no empieza antes de la última palabra
+        musica["fundido_salida"] = round(min(musica["fundido_salida"], total - fin_ultima_palabra), 3)
+    if musica and musica["inicio"] == "auto":
+        musica["inicio"] = inicio_automatico(musica, list(respiros), total, raiz)
+    energia = leer_energia(raiz).get(Path(musica["archivo"]).name) if musica else None
+    if energia and respiros:
+        for aviso in respiros_flojos(energia, float(musica["inicio"]), respiros):
+            print(f"   AVISO: {aviso}")
     entradas = ["-i", voz]
     if musica:
         entradas += ["-ss", musica["inicio"], "-t", f"{total:.3f}", "-i", raiz / musica["archivo"]]
@@ -138,7 +198,11 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
 
     # 1) Mezcla de audio, todavía sin normalizar
     mezcla_wav = salida.parent / "mezcla.wav"
-    grafo_txt.write_text(construir_grafo_audio(total, musica, efectos), encoding="utf-8")
+    r = config["respiros"]
+    subida = (r["subida_musica_db"], r["rampa"], [(x["inicio"], x["fin"]) for x in respiros]) if respiros else None
+    if musica and subida:
+        print(f"   la música sube {r['subida_musica_db']:g} dB en {len(respiros)} respiros")
+    grafo_txt.write_text(construir_grafo_audio(total, musica, efectos, subida), encoding="utf-8")
     ejecutar([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *entradas,
         "-filter_complex_script", grafo_txt, "-map", "[mezcla]", "-t", f"{total:.3f}",
@@ -168,4 +232,5 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos):
     f = medir_volumen(salida, objetivo)
     print(f"   volumen: mezcla {m['input_i']} LUFS, ganancia {ganancia:+.2f} dB "
           f"-> final {f['input_i']} LUFS, pico {f['input_tp']} dBTP")
-    print(f"   duración final: {total:.1f} s, {len(efectos)} efectos")
+    fundido = f", fundido de la música {musica['fundido_salida']:g} s" if musica else ""
+    print(f"   duración final: {total:.1f} s, {len(efectos)} efectos{fundido}")
