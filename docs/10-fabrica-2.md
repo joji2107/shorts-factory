@@ -14,7 +14,8 @@ receta, para que los shorts anteriores se sigan reproduciendo igual.
 | 1 | Versiones de la fábrica: `config/versiones/`, `promover_version.py`, versión en métricas | `ef0d3e4` |
 | 2 | Marcas del guion (`marcas.py`) y paso `respiros` | `a62f00f` |
 | 3 | Ritmo variable y planos protagonistas (`cortes.py`, `material.py`) | `66f357d` |
-| 4 | Música con energía: `musica.json`, inicio automático y subida en los respiros | |
+| 4 | Música con energía: `musica.json`, inicio automático y subida en los respiros | `5cb861f` |
+| 5 | Skill `guion-short` (sección Fábrica 2.0), `hoja_fotogramas.py` y `evaluar_material` con versión | |
 
 ---
 
@@ -176,6 +177,22 @@ de 5 dB; 5 tienen subidas suaves (3-4,4 dB) y 4 son planas.
 - `construir_grafo_audio()` de antes y de ahora con la música de los 9 shorts, con y sin
   efectos: 40 de 40 grafos idénticos.
 - Sonoridad momentánea del vídeo de 902 medida segundo a segundo (arriba).
+
+---
+
+## Parte 5: la skill y las herramientas para elegir protagonistas
+
+- **Skill `guion-short`**: sección nueva «Fábrica 2.0», que se usa si la versión por
+  defecto es 2.0 o se pide. Estructura promesa → escalones → revelación → cierre que
+  enlaza con la promesa, 90-110 palabras, las marcas `[respiro]` y `[plano]`, cómo elegir
+  protagonistas y música (no plana, subida de 5 dB o más, momento fuerte después de la
+  revelación y ningún respiro en un valle). Al cargarse lee la versión por defecto y la
+  tabla de energía de `musica.json`. Todas las recetas llevan ya `version_fabrica`.
+- **`scripts/hoja_fotogramas.py <clips o tema>`**: un fotograma por segundo en mosaico,
+  con el segundo escrito, en `data/cache/fotogramas/<clip>.jpg`. Sirve para elegir el
+  clip y el `desde` de cada plano mirando qué pasa en cada momento.
+- **`evaluar_material(..., version="2.0")`**: simula el reparto con los cortes de relleno
+  (1-2,2 s en vez de 1,5-4 s). Como duración se le pasa voz + respiros − planos.
 
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

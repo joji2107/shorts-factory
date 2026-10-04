@@ -11,11 +11,22 @@ Tema pedido: $ARGUMENTS
 Si el argumento es un short que ya existe (`NNN-tema`, con su carpeta en `shorts/`),
 no hay guion que escribir: ve directamente al paso 5 (Publicación) con su `guion.md`.
 
+**Versión de la fábrica**: si la versión por defecto (abajo) es 2.0, o el usuario pide un
+short "2.0" / "de promesa y recompensa", sigue además la sección **Fábrica 2.0**, que
+cambia la estructura del guion, añade marcas de montaje y elige música y protagonistas.
+Si no, la estructura clásica (gancho, dato, giro, remate).
+
 Todo en español. Explica al usuario qué vas a hacer en cada paso antes de hacerlo
 (está aprendiendo) y respeta las reglas de CLAUDE.md: no se toca `data/` salvo con
 `buscar_clips`, y no se hacen commits sin preguntar.
 
 ## Situación actual (se inyecta al cargar la skill)
+
+Versión de la fábrica por defecto:
+!`grep -o '"version_fabrica": "[^"]*"' config/por_defecto.json || true`
+
+Energía de la música (`biblioteca/musica.json`; momento fuerte en segundos de la canción):
+!`python3 -c "import json;d=json.load(open('biblioteca/musica.json'));[print(k, 'dura', d[k]['duracion'], '| momento fuerte', d[k]['momento_fuerte'], '| subida', d[k]['subida_db'], 'dB', '| PLANA' if d[k]['plana'] else '') for k in sorted(d)]" 2>/dev/null || true`
 
 Velocidad de lectura (`config/lectura.json`):
 !`cat config/lectura.json`
@@ -83,6 +94,81 @@ Enseña al usuario el guion, el recuento de palabras, la duración estimada, la
 técnica y las fuentes. **Espera su visto bueno** antes de crear la ficha; si pide
 cambios, rehaz el guion.
 
+## Fábrica 2.0 (promesa y recompensa)
+
+La idea es la **anticipación**: el espectador sabe desde el principio qué va a ver y se
+queda para ver cómo llega. Todo lo demás de la skill (rigor, fuentes, técnica de
+interacción rotando, número, publicación) se mantiene.
+
+**Estructura** (las etiquetas en negrita son estas, en vez de las clásicas):
+1. **Promesa** (como mucho 12 palabras): dice qué va a ver ("Esto es lo más violento que
+   puede hacer la Tierra"), sin revelarlo. Tiene que cumplirse de verdad al final.
+2. **Escalones**: 3 o 4 descubrimientos pequeños, cada uno más fuerte que el anterior, que
+   acercan a X sin decirlo. Nada del dato principal todavía.
+3. **Revelación**: `[respiro]` justo antes de X, con el plano protagonista más
+   impresionante y la música en su momento fuerte. Después, X en una frase corta.
+4. **Cierre**: enlaza con la promesa (un eco de la primera frase) e incluye la interacción.
+   Encaja con *bucle*, pero la técnica sigue rotando como siempre.
+
+**Longitud**: 90-110 palabras (los respiros añaden segundos). Duración estimada =
+palabras / velocidad + segundos de respiros + cola.
+
+**Marcas de montaje** (entre corchetes, **antes de la palabra** en la que actúan; no se
+leen y la hoja para leer las trata sola):
+- `[respiro N]`: N segundos de silencio de voz (sin N, 2,5 s). El sistema lo inserta: el
+  usuario lee seguido. 1 o 2 por short; el **último es la revelación** (la música se
+  sincroniza con él). Ni al principio ni al final del guion.
+- `[plano clip desde largo]`: plano protagonista, desde ese segundo del clip y durante
+  `largo` s (5-9; como mucho `video.ritmo.plano_max`, 9). Empieza 0,1 s antes de la
+  palabra siguiente, o con el respiro si va justo detrás de uno (`[respiro 3] [plano
+  volcan_03 12 7] Y entonces...`: el plano cubre el silencio y el principio de la frase).
+  2 o 3 por short, sin pisarse; el resto es relleno de cortes rápidos (1-2,2 s).
+
+**Protagonistas**: después de tener el material (paso 3), genera las hojas de fotogramas
+del tema y míralas con Read:
+
+```bash
+docker run --rm -t -v "$PWD:/proyecto" shorts-whisper python /proyecto/scripts/hoja_fotogramas.py <tema>
+```
+
+(`data/cache/fotogramas/<clip>.jpg`, un fotograma por segundo con el segundo escrito.)
+Elige los planos que encajan muy bien con una frase o son especialmente impresionantes o
+divertidos, y el `desde` en el que empieza lo bueno. Comprueba que `desde + largo` no pase
+de la duración del clip. El mejor, para la revelación. Los protagonistas deben ser
+grabaciones reales (no IA).
+
+**Música**: además de las reglas de siempre (no repetir en 5 shorts...), solo canciones
+**no planas con subida de 5 dB o más** (tabla de energía de arriba). Con `"inicio":
+"auto"` (lo pone la versión 2.0), la canción empieza en `momento fuerte − segundo de la
+revelación`, así que hace falta:
+- momento fuerte ≥ segundo estimado de la revelación (si no, empieza en 0 y el momento
+  fuerte llega antes);
+- duración de la canción ≥ momento fuerte − revelación + duración del short.
+
+Si ninguna libre cumple, dilo y pide al usuario música nueva (que la analice con
+`analizar_musica.py`). **Respiros en valles**: con el inicio calculado, mira en la curva
+de `biblioteca/musica.json` qué suena en los demás respiros (segundo de la canción =
+inicio + segundo del respiro en el vídeo). Si cae 6 dB o más por debajo de la mediana, el
+respiro sonará casi en silencio (en 902-respiros, el primero caía en el valle de antes del
+drop de misterio_03): muévelo o quítalo. El render también lo avisa.
+
+**config.json** de un short 2.0 (la versión 2.0 ya activa respiros, ritmo y música
+automática):
+
+```json
+{
+  "version_fabrica": "2.0",
+  "musica": {"archivo": "data/biblioteca/musica/<archivo>.mp3"},
+  "efectos": {"lista": [...]}
+}
+```
+
+**Material**: `evaluar_material(tema, duración, version="2.0")`, con duración = voz +
+respiros − planos protagonistas (el relleno se corta más rápido y gasta más clips).
+
+**guion.md**: en la cabecera, además, `**Música:** <archivo> (momento fuerte en el
+segundo N, inicio automático)` y una línea `**Planos:**` con cada protagonista y por qué.
+
 ## 2. Ficha del short
 
 **Duración estimada** = palabras / `palabras_por_segundo` + la cola (`final.cola` de
@@ -118,10 +204,13 @@ tema va en singular, minúsculas, sin tildes y con `_` entre palabras
 
 **config.json**: solo lo que cambia respecto a la plantilla (el vigilante la pone
 debajo al llegar la grabación). Sin `audio_original` (eso marca la receta como
-reservada) y sin `clips` (los elige el vigilante con la duración real):
+reservada) y sin `clips` (los elige el vigilante con la duración real). Siempre con
+`version_fabrica` (`"1.0"` o `"2.0"`): fija con qué valores se hace el short aunque luego
+cambie la versión por defecto.
 
 ```json
 {
+  "version_fabrica": "1.0",
   "musica": {"archivo": "data/biblioteca/musica/<archivo>.mp3"},
   "efectos": {
     "automaticos": 3,

@@ -348,15 +348,21 @@ def temas_disponibles() -> dict[str, int]:
 
 
 @servidor.tool()
-def evaluar_material(tema: str, duracion_segundos: float = 45) -> str:
+def evaluar_material(tema: str, duracion_segundos: float = 45, version: str = "") -> str:
     """Dice si hay clips suficientes de un tema para un short de esa duración sin repetir
     planos, cuántas veces se ha usado cada clip y, si falta material, cuántos clips más
     hacen falta. Úsala antes de preparar_short y de buscar_clips.
-    duracion_segundos: lo que dura la voz, sin la cola del final (se suma aquí)."""
+    duracion_segundos: lo que dura la voz, sin la cola del final (se suma aquí).
+    version: la de la fábrica del short ('2.0'); vacío, la por defecto. En la 2.0 el
+    relleno se corta más rápido (hacen falta más clips): pasa como duración la voz + los
+    respiros − los planos protagonistas, que no son relleno."""
     tema = tema.strip().lower()
-    if not 10 <= duracion_segundos <= 180:
-        return "La duración tiene que estar entre 10 y 180 segundos."
-    config = material.configuracion()
+    if not 5 <= duracion_segundos <= 180:
+        return "La duración tiene que estar entre 5 y 180 segundos."
+    try:
+        config = material.configuracion(version=version.strip() or None)
+    except RuntimeError as e:
+        return str(e)
     video = config["video"]
     total = duracion_segundos + config["final"]["cola"]
     try:
