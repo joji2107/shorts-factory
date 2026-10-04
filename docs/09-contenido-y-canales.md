@@ -1,6 +1,6 @@
 # Fase 9: Estrategia de contenido y canales
 
-> Estado: en curso.
+> Estado: terminada.
 
 ## Objetivo
 Publicar los shorts en los canales nuevos (YouTube, Instagram, TikTok y X) con

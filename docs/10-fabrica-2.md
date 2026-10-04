@@ -1,6 +1,6 @@
 # Fase 10: Fábrica 2.0
 
-> Estado: en curso.
+> Estado: terminada.
 
 ## Objetivo
 Una nueva versión de la fábrica con otra forma de contar y de montar los shorts:
@@ -17,7 +17,7 @@ receta, para que los shorts anteriores se sigan reproduciendo igual.
 | 4 | Música con energía: `musica.json`, inicio automático y subida en los respiros | `5cb861f` |
 | 5 | Skill `guion-short` (sección Fábrica 2.0), `hoja_fotogramas.py` y `evaluar_material` con versión | `9e31343` |
 | 6 | Prueba completa (011-volcan) y 2.0 como versión por defecto | `a194a80`, `4f803ec` |
-| 7 | Scripts `arrancar.sh` y `apagar.sh` | |
+| 7 | Scripts `arrancar.sh` y `apagar.sh` | `f6b85db` |
 
 ---
 

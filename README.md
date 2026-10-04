@@ -17,10 +17,13 @@ FFmpeg, Python, Git, agentes de IA y documentación técnica.
 - [x] Fase 6: Montaje del short (clips, voz, música, efectos y subtítulos)
 - [x] Fase 7: Automatización con Python (pipeline completo y carpeta bandeja)
 - [x] Fase 8: Servidor MCP y Claude Code (agente, clips de Pixabay y guiones)
-- [ ] Fase 9: Estrategia de contenido y canales
+- [x] Fase 9: Estrategia de contenido y canales (textos de publicación, métricas)
+- [x] Fase 10: Fábrica 2.0 (promesa y recompensa, respiros, planos protagonistas, música con energía)
+- [ ] Fase 11: Megaproyectos y nuevas fuentes (Wikimedia Commons, NASA, fotos como clips)
 - [ ] Producción: publicar al menos 3 shorts por semana
 
-Shorts hechos: 2 (`shorts/001-pulpo` y `shorts/002-caballo`, este en revisión).
+Shorts hechos: 11 (de `shorts/001-pulpo` a `shorts/011-volcan`, el primero de la fábrica 2.0);
+publicados, 8 (de 001 a 008).
 
 ## Uso diario
 
@@ -160,6 +163,8 @@ docker build -f Dockerfile.whisper -t shorts-whisper .
 | 6 | `docs/06-montaje.md` |
 | 7 | `docs/07-automatizacion.md` |
 | 8 | `docs/08-agente.md` |
+| 9 | `docs/09-contenido-y-canales.md` |
+| 10 | `docs/10-fabrica-2.md` |
 
 ## Entorno
 
