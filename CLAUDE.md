@@ -35,7 +35,7 @@ No hay tests ni linter. Comprobaciones que usa el proyecto:
 
 ## Arquitectura
 
-**Flujo**: `data/bandeja/NNN-tema.wav` → `vigilar_bandeja.py` mueve el audio a `data/archivo/`, crea la receta `shorts/NNN-tema/config.json` y llama a `crear()` de `crear_short.py` → vídeo final movido a `data/revision/`. Si falla: audio a `data/errores/` con un `.log`. Todo se anota en `data/registro.log`. El usuario mueve a mano de `revision/` a `listos/`.
+**Flujo**: `data/bandeja/NNN-tema.wav` → `vigilar_bandeja.py` mueve el audio a `data/archivo/`, crea la receta `shorts/NNN-tema/config.json` y llama a `crear()` de `crear_short.py` → vídeo final movido a `data/revision/`. Si falla: audio a `data/errores/` con un `.log`. Si el tema del nombre no tiene clips y se parece al menos un 80 % (`PARECIDO_NOMBRE`, `difflib`) a una receta reservada o a un tema del índice, el error lo sugiere («¿Querías decir 008-orionidas?»); no renombra nada. Todo se anota en `data/registro.log`. El usuario mueve a mano de `revision/` a `listos/`.
 
 **Configuración por capas** (`fusionar()` en `crear_short.py`, fusión recursiva de diccionarios; las listas se sustituyen enteras):
 1. `config/por_defecto.json`: todos los valores.

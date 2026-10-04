@@ -419,7 +419,13 @@ del mundo» del 13 de noviembre de 2026 y las Oriónidas) se hicieron dos:
 ### Erratas en el nombre de la grabación
 `007-camnio_hora.wav` y `008-oriondas.wav` acabaron en `data/errores/` («No hay vídeos
 con la etiqueta...»). No llegaron a crear nada: bastó con devolverlos a la bandeja con
-el nombre bien escrito.
+el nombre bien escrito. Para que se note enseguida, el vigilante busca ahora con
+`difflib.get_close_matches` el nombre más parecido (80 % como mínimo): primero entre las
+recetas reservadas («¿Querías decir 010-volcan? Renombra la grabación...») y, si no,
+entre los temas del índice («¿Querías decir el tema 'orionidas'?»). No renombra nada:
+adivinar mal sería peor que avisar. Probado con las dos erratas, con `009-caballos`
+(sugiere `caballo`), con un tema nuevo (`volcan`, sin sugerencia) y con una receta
+reservada de prueba en `/tmp` del contenedor.
 
 ### «Doscientos mil» sin resaltar
 Whisper escribió «más de 200.000 km por hora» donde el guion dice «más de **doscientos

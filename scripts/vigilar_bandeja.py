@@ -12,6 +12,7 @@ Flujo:
 Todo queda anotado en data/registro.log.
 """
 import argparse
+import difflib
 import json
 import shutil
 import time
@@ -30,6 +31,7 @@ ERRORES = DATA / "errores"
 REVISION = DATA / "revision"
 REGISTRO = DATA / "registro.log"
 EXTENSIONES = {".wav", ".mp3", ".m4a", ".aif", ".aiff"}
+PARECIDO_NOMBRE = 0.8      # parecido mínimo (de 0 a 1) para sugerir un nombre ante una errata
 
 
 def registrar(mensaje):
@@ -46,6 +48,29 @@ def esta_completo(archivo, espera=3):
     tamano = archivo.stat().st_size
     time.sleep(espera)
     return tamano > 0 and archivo.stat().st_size == tamano
+
+
+def sugerencia(nombre, tema):
+    """Si el nombre de la grabación parece una errata ("008-oriondas"), el nombre que
+    seguramente se quería: primero entre las recetas reservadas (con guion y sin
+    grabación todavía) y, si no, entre los temas del índice. No renombra nada: adivinar
+    mal sería peor que avisar."""
+    reservadas = []
+    for receta in (RAIZ / "shorts").glob("[0-9][0-9][0-9]-*"):
+        ruta = receta / "config.json"
+        if (receta / "guion.md").exists() and ruta.exists() \
+                and "audio_original" not in json.loads(ruta.read_text(encoding="utf-8")):
+            reservadas.append(receta.name)
+    parecida = difflib.get_close_matches(nombre, reservadas, n=1, cutoff=PARECIDO_NOMBRE)
+    if parecida:
+        return (f". ¿Querías decir {parecida[0]}? Renombra la grabación de data/errores/ "
+                f"y déjala otra vez en la bandeja")
+    temas = {e for fila in material.leer_indice() if fila["tipo"].strip() == "video"
+             for e in fila["etiquetas"].strip().split(";") if e}
+    parecido = difflib.get_close_matches(tema, sorted(temas), n=1, cutoff=PARECIDO_NOMBRE)
+    if parecido:
+        return f". ¿Querías decir el tema '{parecido[0]}'?"
+    return ""
 
 
 def preparar_receta(nombre, audio, plantilla):
@@ -72,7 +97,8 @@ def preparar_receta(nombre, audio, plantilla):
     tema = nombre.split("-", 1)[-1]              # "002-caballo" -> "caballo"
     tiene_clips = config.get("video", {}).get("clips")
     if not tiene_clips and not (receta / "cortes.txt").exists() and not material.clips_del_tema(tema):
-        raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv")
+        raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv"
+                           + sugerencia(nombre, tema))
 
     receta.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
