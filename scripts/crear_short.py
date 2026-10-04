@@ -173,9 +173,11 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
             if not efectos and config["efectos"]["automaticos"] > 0:
                 efectos = elegir_efectos(edl, palabras_final, config)
             palabras = json.loads(palabras_final.read_text(encoding="utf-8"))
+            respiros = (json.loads(archivos["respiros"].read_text(encoding="utf-8"))
+                        if con_respiros else [])
             render(archivos["fondo"], voz_final, archivos["subtitulos"],
                    trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos,
-                   palabras[-1]["fin"] if palabras else None)
+                   palabras[-1]["fin"] if palabras else None, respiros)
 
         rehechos.add(paso)
 

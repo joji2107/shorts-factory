@@ -13,7 +13,8 @@ receta, para que los shorts anteriores se sigan reproduciendo igual.
 |---|---|---|
 | 1 | Versiones de la fábrica: `config/versiones/`, `promover_version.py`, versión en métricas | `ef0d3e4` |
 | 2 | Marcas del guion (`marcas.py`) y paso `respiros` | `a62f00f` |
-| 3 | Ritmo variable y planos protagonistas (`cortes.py`, `material.py`) | |
+| 3 | Ritmo variable y planos protagonistas (`cortes.py`, `material.py`) | `66f357d` |
+| 4 | Música con energía: `musica.json`, inicio automático y subida en los respiros | |
 
 ---
 
@@ -126,6 +127,55 @@ El vigilante descuenta el tiempo de los planos y elige el relleno sin los protag
   `[respiro 3]`: el primero va de 11,63 a 17,63 s, el segundo empieza con el respiro
   (21,97 s), el último respiro es un solo plano de 2,5 s y el resto, 18 cortes de 1,1 a
   2,2 s. Los cortes suman 41,433 s, lo mismo que el vídeo.
+
+---
+
+## Parte 4: música con energía
+
+### Energía de cada canción
+`scripts/analizar_musica.py` (en Docker; `--todas` para repetir las ya analizadas) mide
+cada canción con `ebur128` (sonoridad de corto plazo, ventana de 3 s), la resume en un
+valor por segundo y busca su **momento fuerte**: el segundo en que más sube la media de
+los 6 s siguientes sobre la de los 6 s anteriores (la entrada del estribillo o del
+*drop*). Lo que viene tiene que quedar al menos 0,5 dB sobre la mediana de la canción y
+no se busca en los 10 primeros segundos (la intro). Si la mayor subida no llega a 3 dB,
+la canción es **plana**.
+
+Se guarda en `biblioteca/musica.json` (va a Git; una línea por canción): duración,
+mediana, momento fuerte, subida, dB sobre la mediana, si es plana y la curva por
+segundo. No va en `indice.csv` porque el índice es de licencias, con 8 columnas fijas, y
+la curva es una lista.
+
+**Problema:** la primera versión pedía que el tramo fuerte quedara 2 dB sobre la mediana.
+`misterio_03` es fuerte casi todo el rato (mediana alta) y su mejor momento, la vuelta
+tras un valle de −20 dB en el segundo 127 (+8,6 dB), se descartaba; ganaba el 46.
+**Solución:** lo que se nota es el contraste con lo que sonaba justo antes, así que la
+mediana solo sirve para descartar subidas desde el silencio (0,5 dB), y plana se decide
+por la subida.
+
+Resultado con las 11 canciones: solo `misterio_03` (8,6 dB) y `alegria_03` (5,2 dB) pasan
+de 5 dB; 5 tienen subidas suaves (3-4,4 dB) y 4 son planas.
+
+### En el render
+- `musica.inicio: "auto"` (versión 2.0): la canción empieza en `momento fuerte −
+  revelación`, siendo la revelación el último respiro. Si el momento fuerte llega antes que
+  la revelación, desde 0; si la canción se acabaría antes que el vídeo, se adelanta lo
+  justo (`inicio_musica()`, con aviso). Sin respiros, sin analizar o plana: desde 0, con aviso.
+- En cada respiro la voz calla, así que el *ducking* se suelta solo, y además la música
+  sube `respiros.subida_musica_db` (5 dB) con un `volume` por fotograma: empieza a subir al
+  callarse la voz y termina de bajar justo cuando vuelve (rampas de 0,5 s). Sin respiros,
+  el grafo es el de siempre.
+- **Problema:** en 902-respiros, con la revelación a 36,56 s, `misterio_03` empieza en
+  90,44 s y la revelación suena en pleno momento fuerte (−17,5 LUFS solo con música, la
+  voz va a −13/−15). Pero el primer respiro caía en el valle de antes del *drop* y sonaba
+  a −28 LUFS: un silencio muerto. Mover la canción rompería la sincronía, así que el
+  render avisa (`respiros_flojos()`) cuando un respiro cae 6 dB o más por debajo de la
+  mediana de la canción, para moverlo o quitarlo en el guion.
+
+### Comprobación
+- `construir_grafo_audio()` de antes y de ahora con la música de los 9 shorts, con y sin
+  efectos: 40 de 40 grafos idénticos.
+- Sonoridad momentánea del vídeo de 902 medida segundo a segundo (arriba).
 
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

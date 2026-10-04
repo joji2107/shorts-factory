@@ -9,7 +9,8 @@
     "margen_inicio": 0.15
   },
   "musica": {
-    "archivo": "data/biblioteca/musica/misterio_02.mp3"
+    "archivo": "data/biblioteca/musica/misterio_03.mp3",
+    "inicio": "auto"
   },
   "efectos": {
     "automaticos": 3,
