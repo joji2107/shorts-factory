@@ -26,6 +26,7 @@ from pasos.utilidades import duracion
 INDICE = RAIZ / "biblioteca" / "indice.csv"
 VIDEOS = RAIZ / "data" / "biblioteca" / "video"
 MIN_CLIPS = 6
+DESCARTADO = "descartado"
 
 
 def leer_indice():
@@ -42,12 +43,19 @@ def leer_indice():
     return filas
 
 
+def descartado(fila):
+    """Un clip con la etiqueta 'descartado' no se elige nunca (no muestra el tema, por
+    ejemplo). Sigue en el índice: la biblioteca no se borra y así no se vuelve a descargar."""
+    return DESCARTADO in fila["etiquetas"].strip().split(";")
+
+
 def clips_del_tema(tema, filas=None):
-    """Los vídeos del índice con esa etiqueta (nombre sin extensión)."""
+    """Los vídeos del índice con esa etiqueta (nombre sin extensión), sin los descartados."""
     return [
         Path(fila["archivo"]).stem
         for fila in (filas if filas is not None else leer_indice())
         if fila["tipo"].strip() == "video" and tema in fila["etiquetas"].strip().split(";")
+        and not descartado(fila)
     ]
 
 

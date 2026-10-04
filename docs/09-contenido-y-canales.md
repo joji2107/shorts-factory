@@ -209,6 +209,22 @@ causa, no solo en este short.
 - Quedan en la biblioteca 16 clips de rayo que no sirven (no se pueden borrar): se
   usan los 6 nuevos grabados de verdad (`rayo_17` a `rayo_20`, `rayo_22`, `rayo_23`) y
   `rayo_05` (IA, con un rayo muy claro).
+- **Corrección del 2026-10-04**: esos clips no llevaban ninguna marca y, como el
+  vigilante elige primero los menos usados, el próximo short de rayos los habría
+  elegido a ellos. Se revisaron uno a uno (la marca `isAiGenerated` guardada en
+  `data/cache/pixabay/` y hojas de contactos en `data/pruebas/rayo_revision_a.png` y
+  `_b.png`) y en `biblioteca/indice.csv` se les añadió la etiqueta nueva `descartado`:
+  - sin rayo: 04 (habitación de neón), 08 (olas), 09 (piedras), 12 (arrozales), 13 (árbol
+    y luna), 15 y 16 (árboles con estrellas);
+  - IA o animación en vez de rayos de verdad: 01, 02, 03, 06, 10, 11, 14 y 07 (un rayo
+    dibujado).
+
+  `clips_del_tema()` de `material.py` ya no devuelve los descartados. Además, `ia` en
+  los 7 que Pixabay marca y en `rayo_05`, que Pixabay **no** marca pero se ve generado:
+  así el vigilante lo deja para el final. `rayo_21` no se descarta: es un rayo real,
+  casi todo negro con un destello, justo el caso de `buscar_destellos`. Quedan 8 clips
+  de rayo utilizables y `evaluar_material` da *suficiente* para 40 s; simulando
+  `elegir_clips`, salen 6 clips reales y `rayo_05` se queda fuera.
 
 ### El efecto de error, a destiempo
 `error_01.mp3` empieza con 0,6 s de silencio, así que sonaba 0,6 s después de la
@@ -397,6 +413,7 @@ datos reales: ninguna medida pendiente hoy; la primera es 001-pulpo a las 48 h, 
 | `awk` daba los tiempos de los cortes redondeados | Con el idioma del Mac, `awk` espera coma decimal | `LC_ALL=C awk ...` | |
 | Con 6 clips de rayo, `evaluar_material` decía "justo" y pedía uno más (003-rayo) | La skill le pasaba la duración estimada (con la cola) y la herramienta vuelve a sumar la cola: 47 s en vez de 44,4 | Pasarle la duración de la voz (palabras / velocidad); con 41,9 s, "suficiente" | Skill, docstring de la herramienta y `CLAUDE.md` dicen que es sin la cola |
 | `buscar_clips` descargó clips sin rayo o hechos con IA | Se quedaba con los primeros resultados de Pixabay, que mezcla vídeos parecidos, y priorizaba los verticales | Palabra clave en las etiquetas, primero los que no son IA, `ver_candidatos` con miniaturas y descarga por `ids` | Mirar las miniaturas antes de descargar: lo que entra en la biblioteca no se borra |
+| El próximo short de rayos habría elegido los 15 clips que no sirven | Seguían en el índice sin marca y `elegir_clips` empieza por los menos usados | Etiqueta `descartado`, que `clips_del_tema()` excluye; `ia` en `rayo_05` | Al descargar un clip que luego no sirve, descartarlo en el índice en el momento |
 | Cortes de tormenta en negro | En lo grabado de verdad, el rayo dura un instante | `video.buscar_destellos`: cada corte empieza antes de un destello | La skill lo pide para temas de un instante |
 | El efecto de error sonaba tarde | `error_01.mp3` empieza con 0,6 s de silencio | Restar el silencio inicial al anclar a una palabra | Medir los efectos nuevos con `silencedetect` |
 | El bucle no enlazaba | El vídeo acababa casi 3 s después de la última palabra | `final.tras_ultima_palabra` y fundido de la música que no empieza antes de la última palabra | La skill lo pone en los guiones con bucle |

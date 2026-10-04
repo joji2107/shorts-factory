@@ -67,10 +67,10 @@ def _filas_indice():
 
 
 def _temas():
-    """Cuenta cuántos vídeos hay de cada etiqueta."""
+    """Cuenta cuántos vídeos utilizables hay de cada etiqueta (sin los descartados)."""
     contador = Counter()
     for fila in _filas_indice():
-        if fila["tipo"].strip() == "video":
+        if fila["tipo"].strip() == "video" and not material.descartado(fila):
             contador.update(e for e in fila["etiquetas"].strip().split(";") if e)
     return contador
 

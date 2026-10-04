@@ -196,7 +196,10 @@ palabra (en vez de 2,5 s de cola) y la música se funde en ese medio segundo.
    - `buscar_clips(tema, ids="id1,id2")` con los elegidos (máximo 5 por llamada) y,
      si el tema es nuevo, una o dos `etiquetas_generales` en singular y sin tildes.
    - Después, comprueba los clips descargados con fotogramas: lo que entra en la
-     biblioteca ya no se puede borrar.
+     biblioteca ya no se puede borrar. Si alguno no sirve (no se ve el tema, o es IA o
+     animación sin el tema de verdad), añade al final de sus etiquetas en
+     `biblioteca/indice.csv` `;descartado` (y `;ia` si es IA aunque Pixabay no lo
+     marque): el vigilante y `evaluar_material` dejan de contarlo.
    - Si el tema es algo que dura un instante (rayos, relámpagos, fuegos
      artificiales), pon `"video": {"buscar_destellos": true}` en `config.json`:
      cada corte empieza justo antes de un destello. Si no, en un clip de tormenta

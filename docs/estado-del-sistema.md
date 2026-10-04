@@ -209,7 +209,7 @@ unas 2400 líneas añadidas. Agrupados por tema:
 
 | Tema | Clips | Fuente |
 |---|---|---|
-| rayo | 23 | Pixabay |
+| rayo | 23 (8 utilizables: 15 con `descartado`) | Pixabay |
 | caribe | 8 | Pixabay |
 | columna | 7 | Pixabay |
 | elefante | 7 | Pixabay |
@@ -281,12 +281,8 @@ y se comparan con `scripts/analizar_metricas.py`.
 ## 7. Problemas conocidos, pendientes y mejoras
 
 ### Problemas conocidos
-- **Los clips de rayo viejos no llevan la etiqueta `ia`**. Ningún clip del índice la
-  tiene, ni siquiera `rayo_05`, que la bitácora identifica como IA. Los clips
-  `rayo_01` a `rayo_16` se descargaron antes de la corrección. Como `elegir_clips`
-  empieza por los menos usados, un próximo short de rayos elegiría justo esos 16, que
-  la bitácora da por inservibles (sin rayo o de IA). Habría que etiquetarlos en el
-  índice (está en Git, no en `data/`) o marcarlos de algún modo para que no se elijan.
+- ~~Los clips de rayo viejos no llevaban marca~~ **(resuelto el 2026-10-04)**: 15 tienen
+  la etiqueta `descartado`, que `material.py` excluye, y `rayo_05` lleva `ia`.
 - **Rehacer el fondo cambia los cortes al azar.** El paso `fondo` vuelve a llamar a
   `crear_edl()` aunque ya exista `cortes_auto.txt`. Como el vigilante borra
   `fondo.mp4`, un `--rehacer subtitulos` posterior regenera el fondo con otros cortes
@@ -320,8 +316,6 @@ y se comparan con `scripts/analizar_metricas.py`.
 ### Partes del código que mejoraría
 - **`cortes.py` / `crear_short.py`**: reutilizar `cortes_auto.txt` si existe y la
   transcripción no se ha rehecho; repartir los cortes otra vez solo cuando se pida.
-- **`material.py`**: una forma de excluir clips (una etiqueta como `descartado`) para
-  no depender de que nunca se elijan.
 - **`vigilar_bandeja.py`**: borrar el `.log` de errores antiguo de un short cuando sale
   bien, y calcular la duración para los clips con el final real (por ejemplo,
   recortando también el silencio final en el paso `voz`).
