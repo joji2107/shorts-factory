@@ -3,7 +3,8 @@
 - shorts/publicaciones.csv: una línea por short y plataforma, con la fecha y hora de
   publicación y la versión exacta del vídeo (archivo de data/listos/ y su md5).
 - shorts/metricas.csv: una línea por short, plataforma y momento de medida (48h o 7d),
-  con las cifras y algunos datos de la ficha (técnica, tema, música, duración) para
+  con las cifras y algunos datos de la ficha (técnica, tema, música, duración, versión de
+  la fábrica) para
   poder compararlos después.
 
 Una celda vacía significa "no lo sé"; un 0 significa "ninguno".
@@ -31,7 +32,7 @@ COLUMNAS_PUBLICACIONES = ["short", "plataforma", "publicado", "archivo", "md5", 
 ENTEROS = ["visualizaciones", "likes", "comentarios", "compartidos", "seguidores"]
 NUMEROS = ["visualizaciones", "se_quedaron_pct", "duracion_media_s",
            "likes", "comentarios", "compartidos", "seguidores"]
-FICHA = ["tecnica", "tema", "musica", "duracion_s"]
+FICHA = ["tecnica", "tema", "musica", "duracion_s", "version_fabrica"]
 COLUMNAS_METRICAS = ["short", "plataforma", "momento", "medido"] + NUMEROS + FICHA + ["notas"]
 
 
@@ -113,19 +114,22 @@ def nueva_publicacion(short, plataforma, publicado, archivo="", notas="", carpet
 
 def ficha(short, archivo=""):
     """Datos del short que se guardan junto a cada medida: técnica de interacción (de
-    guion.md), tema (del nombre), música (de la receta) y duración del vídeo publicado."""
+    guion.md), tema (del nombre), música y versión de la fábrica (de la receta) y duración
+    del vídeo publicado."""
     guion = RAIZ / "shorts" / short / "guion.md"
     tecnica = ""
     if guion.exists():
         encontrada = re.search(r"\*\*Técnica de interacción:\*\*\s*(.+)", guion.read_text(encoding="utf-8"))
         tecnica = encontrada.group(1).strip() if encontrada else ""
-    musica = cargar_config(short)["musica"]["archivo"]
+    config = cargar_config(short)
+    musica = config["musica"]["archivo"]
     try:
         segundos = f"{duracion(video_publicado(short, archivo)):.2f}"
     except (ValueError, RuntimeError):
         segundos = ""
     return {"tecnica": tecnica, "tema": short.split("-", 1)[-1],
-            "musica": Path(musica).stem if musica else "", "duracion_s": segundos}
+            "musica": Path(musica).stem if musica else "", "duracion_s": segundos,
+            "version_fabrica": config["version_fabrica"]}
 
 
 def pendientes(ahora=None, carpeta=CARPETA):

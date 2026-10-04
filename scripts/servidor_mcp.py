@@ -402,7 +402,8 @@ def evaluar_material(tema: str, duracion_segundos: float = 45) -> str:
 
 @servidor.tool()
 def listar_shorts() -> list[dict]:
-    """Los shorts que tienen receta en shorts/, en qué estado está su vídeo, dónde y
+    """Los shorts que tienen receta en shorts/, con qué versión de la fábrica se hacen
+    (version_fabrica de la receta, o la por defecto si no la dice), en qué estado está su vídeo, dónde y
     cuándo se ha publicado (de shorts/publicaciones.csv) y qué medidas de métricas le
     faltan: 'pendiente' si ya toca, 'próxima' con la fecha si todavía no."""
     publicaciones = metricas.leer_publicaciones()
@@ -421,7 +422,11 @@ def listar_shorts() -> list[dict]:
             estado = "con error"
         else:
             estado = "sin vídeo (reservado o pendiente de procesar)"
-        ficha = {"short": nombre, "estado": estado}
+        try:
+            version = metricas.cargar_config(nombre)["version_fabrica"]
+        except RuntimeError as error:
+            version = f"error: {error}"
+        ficha = {"short": nombre, "version_fabrica": version, "estado": estado}
         if publicado:
             ficha["publicado"] = publicado
             ficha["medidas_pendientes"] = [

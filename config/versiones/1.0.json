@@ -1,0 +1,5 @@
+{
+  "respiros": {"activo": false},
+  "video": {"ritmo": {"activo": false}},
+  "musica": {"inicio": 0}
+}

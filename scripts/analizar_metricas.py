@@ -1,4 +1,5 @@
-"""Compara cómo funcionan los shorts por técnica de interacción, tema y duración.
+"""Compara cómo funcionan los shorts por técnica de interacción, tema, duración y
+versión de la fábrica (1.0, 2.0...).
 
 Uso: python analizar_metricas.py [--momento 7d|48h] [--plataforma youtube]
 
@@ -43,6 +44,7 @@ def preparar(fila):
         "tecnica": fila["tecnica"] or "sin técnica",
         "tema": fila["tema"],
         "duracion": tramo(dur),
+        "version": fila.get("version_fabrica") or "sin versión",
     }
     for campo in TASAS:
         valor = numero(fila[campo])
@@ -82,7 +84,7 @@ def tabla(filas, agrupar, plataforma):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compara los shorts por técnica, tema y duración")
+    parser = argparse.ArgumentParser(description="Compara los shorts por técnica, tema, duración y versión")
     parser.add_argument("--momento", choices=list(metricas.MOMENTOS),
                         help="Por defecto 7d si hay medidas de 7 días; si no, 48h")
     parser.add_argument("--plataforma", choices=metricas.PLATAFORMAS)
@@ -109,7 +111,8 @@ def main():
             print(f"AVISO: solo {len(filas)} shorts medidos (menos de {MIN_PLATAFORMA}). "
                   "Las diferencias pueden ser casualidad: tómalo como pistas, no como conclusiones.")
         grupos_por = {}
-        for titulo, campo in (("Por técnica", "tecnica"), ("Por tema", "tema"), ("Por duración", "duracion")):
+        for titulo, campo in (("Por técnica", "tecnica"), ("Por tema", "tema"), ("Por duración", "duracion"),
+                              ("Por versión de la fábrica", "version")):
             print(f"\n {titulo}")
             grupos_por[campo] = tabla(filas, campo, plataforma)
         if all(len(m) == 1 for m in grupos_por["tema"].values()):

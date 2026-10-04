@@ -19,7 +19,7 @@ import statistics
 from collections import Counter
 from pathlib import Path
 
-from crear_short import RAIZ, fusionar
+from crear_short import RAIZ, config_base, fusionar
 from pasos.cortes import repartir
 from pasos.utilidades import duracion
 
@@ -68,11 +68,10 @@ def clips_ia(filas=None):
     }
 
 
-def configuracion(plantilla="curiosidades"):
-    """La configuración que tendrá un short nuevo: por defecto + plantilla."""
-    base = json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8"))
+def configuracion(plantilla="curiosidades", version=None):
+    """La configuración que tendrá un short nuevo: por defecto + versión + plantilla."""
     ruta = RAIZ / "config" / "plantillas" / f"{plantilla}.json"
-    return fusionar(base, json.loads(ruta.read_text(encoding="utf-8")))
+    return fusionar(config_base(version), json.loads(ruta.read_text(encoding="utf-8")))
 
 
 def usos():

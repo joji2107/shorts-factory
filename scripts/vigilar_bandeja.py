@@ -22,7 +22,7 @@ from pathlib import Path
 
 import lectura
 import material
-from crear_short import RAIZ, crear, fusionar
+from crear_short import RAIZ, config_base, crear, fusionar
 
 DATA = RAIZ / "data"
 BANDEJA = DATA / "bandeja"
@@ -91,6 +91,8 @@ def preparar_receta(nombre, audio, plantilla):
         config = config_plantilla
 
     config["audio_original"] = str(audio.relative_to(RAIZ))
+    # La receta guarda con qué versión de la fábrica se hizo (la reservada ya la trae de la skill)
+    config.setdefault("version_fabrica", config_base()["version_fabrica"])
 
     # Los clips se eligen después de la voz, con la duración real (despues_de_voz).
     # Aquí solo se comprueba que el tema tenga alguno, para fallar antes de procesar.

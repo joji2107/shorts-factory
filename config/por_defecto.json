@@ -1,4 +1,5 @@
 {
+  "version_fabrica": "1.0",
   "voz": {
     "inicio": 0,
     "quitar_ruidos": {"umbral": "-35dB", "duracion_max": 0.15, "hueco_min": 0.2, "margen": 0.15},
@@ -31,6 +32,7 @@
     "corte_max": 4.0,
     "pausa_corte": 0.15,
     "buscar_destellos": false,
+    "ritmo": {"activo": false, "relleno_min": 1.0, "relleno_max": 2.2, "plano_max": 9.0},
     "clips": []
   },
   "musica": {
@@ -44,6 +46,7 @@
     "ataque_ducking": 20,
     "relajacion_ducking": 400
   },
+  "respiros": {"activo": false, "segundos": 2.5, "subida_musica_db": 5, "rampa": 0.5},
   "efectos": {
     "volumen": 0.5,
     "pico": -3.0,

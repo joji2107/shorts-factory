@@ -65,10 +65,29 @@ def anclar_a_palabras(efectos, json_palabras):
     return resultado
 
 
-def cargar_config(nombre):
+def config_base(version=None):
+    """Valores por defecto + los de una versión de la fábrica (config/versiones/<v>.json).
+    Los de cada versión están congelados en su archivo: un short hecho con la 1.0 sigue
+    saliendo igual aunque los valores por defecto pasen a ser los de la 2.0.
+    Sin versión, se usa la de por_defecto.json."""
     base = json.loads((RAIZ / "config" / "por_defecto.json").read_text(encoding="utf-8"))
+    version = version or base["version_fabrica"]
+    ruta = RAIZ / "config" / "versiones" / f"{version}.json"
+    if not ruta.exists():
+        raise RuntimeError(f"La versión de la fábrica '{version}' no está en config/versiones/")
+    base = fusionar(base, json.loads(ruta.read_text(encoding="utf-8")))
+    base["version_fabrica"] = version
+    return base
+
+
+def cargar_config(nombre):
+    """Por defecto -> versión de la receta (o la por defecto) -> receta."""
     ruta_propia = RAIZ / "shorts" / nombre / "config.json"
     propia = json.loads(ruta_propia.read_text(encoding="utf-8")) if ruta_propia.exists() else {}
+    try:
+        base = config_base(propia.get("version_fabrica"))
+    except RuntimeError as error:
+        raise RuntimeError(f"{nombre}: {error}") from None
     return fusionar(base, propia)
 
 
