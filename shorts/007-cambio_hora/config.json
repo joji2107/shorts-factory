@@ -1,0 +1,10 @@
+{
+  "musica": {"archivo": "data/biblioteca/musica/alegria_02.mp3"},
+  "efectos": {
+    "lista": [
+      {"archivo": "data/biblioteca/sfx/error_02.mp3", "palabra": "agricultores"},
+      {"archivo": "data/biblioteca/sfx/ding_02.mp3", "palabra": "carbón"},
+      {"archivo": "data/biblioteca/sfx/whoosh_02.mp3", "palabra": "curioso"}
+    ]
+  }
+}
