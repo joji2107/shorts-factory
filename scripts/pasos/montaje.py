@@ -8,7 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .clips import es_foto, filtro_foto, ruta_clip
+from .clips import es_foto, filtro_foto, filtro_marcas, ruta_clip
 from .musica import inicio_musica, leer_energia, respiros_flojos
 from .utilidades import ejecutar, duracion
 
@@ -27,8 +27,11 @@ ENCUADRES = {
 }
 
 
-def generar_fondo(edl, biblioteca, carpeta, salida, c):
-    """Crea un corte por cada línea de la lista y los une en un solo vídeo."""
+def generar_fondo(edl, biblioteca, carpeta, salida, c, marcas=None):
+    """Crea un corte por cada línea de la lista y los une en un solo vídeo.
+    marcas: las de biblioteca/marcas.json (marcas_de_agua); las marcas de agua de cada clip se
+    desenfocan al cortarlo, así salen tapadas en cualquier short y en cualquier momento."""
+    marcas = marcas or {}
     carpeta.mkdir(exist_ok=True)
     lineas = [l.split() for l in edl.read_text(encoding="utf-8").splitlines() if l.strip()]
 
@@ -45,7 +48,7 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c):
             filtro = filtro_foto(ruta, float(inicio), c["imagen"])
         else:
             entrada = ["-ss", inicio, "-i", ruta]
-            filtro = ENCUADRES[c["encuadre"]]
+            filtro = filtro_marcas(marcas.get(clip, []), float(inicio), largo) + ENCUADRES[c["encuadre"]]
         ejecutar([
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             *entrada, "-frames:v", fotogramas,
@@ -202,6 +205,19 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_
     if musica and musica["inicio"] == "auto":
         musica["inicio"] = inicio_automatico(musica, list(respiros), total, raiz)
     energia = leer_energia(raiz).get(Path(musica["archivo"]).name) if musica else None
+    if musica and musica.get("sonoridad") is not None:
+        # Las canciones vienen grabadas con sonoridades muy distintas (de -19 a -6 LUFS de
+        # mediana): con el mismo volumen, ciencia_01 (-9) sonaba en 014 unos 6 dB más fuerte
+        # que misterio_03 (-15,5) en 010. Primero se lleva la mediana de la canción
+        # (biblioteca/musica.json) a musica.sonoridad y después se aplica musica.volumen.
+        if energia:
+            ajuste = musica["sonoridad"] - energia["mediana_lufs"]
+            musica["volumen"] = round(musica["volumen"] * 10 ** (ajuste / 20), 4)
+            print(f"   música: mediana {energia['mediana_lufs']:g} LUFS, ajuste {ajuste:+.1f} dB "
+                  f"(sonoridad {musica['sonoridad']:g}), volumen {musica['volumen']:g}")
+        else:
+            print(f"   AVISO: {Path(musica['archivo']).name} no está en biblioteca/musica.json "
+                  "(analizar_musica.py): la música no se iguala")
     if energia and respiros:
         for aviso in respiros_flojos(energia, float(musica["inicio"]), respiros):
             print(f"   AVISO: {aviso}")

@@ -41,6 +41,7 @@
     "archivo": null,
     "inicio": 0,
     "volumen": 0.25,
+    "sonoridad": null,
     "fundido_entrada": 1,
     "fundido_salida": 3.0,
     "umbral_ducking": 0.042,

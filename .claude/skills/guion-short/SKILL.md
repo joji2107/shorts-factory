@@ -179,6 +179,15 @@ vertical → foto horizontal**. Se pasa al siguiente solo cuando no se encuentra
 busca primero vídeo (Pixabay, vídeos de Commons) del objeto concreto y solo después fotos.
 `ver_candidatos` ya los ordena así y el vigilante elige el relleno con ese orden.
 
+**Sin costa con edificios** (lo pidió el usuario en 014): para el mar, la costa o la playa,
+mejor mar, rocas, calas y costa natural; los pueblos y ciudades costeros vistos desde el aire
+(Liguria, Amalfi, Barcelona) no quedan bien. Mira las miniaturas con esto en cuenta.
+
+**Clips con marca de agua** (TikTok, cadenas): antes de usarlos, mide sus marcas (una hoja con
+cuadrícula del 10 % y el segundo en que saltan de sitio) y añade sus cajas a
+`biblioteca/marcas.json`; el montaje las desenfoca solo. Su licencia es «falta»:
+`revisar_publicacion.py` lo avisa y publicar es decisión del usuario.
+
 **Fotos y vídeo, mezclados**: las fotos de Commons (con movimiento Ken Burns) son un recurso
 más, pero **un short nunca debe salir solo de fotos** (en 012 no había ni un vídeo y al usuario
 no le gustó; el vigilante lo avisa en el registro). Si el material auténtico del tema son solo

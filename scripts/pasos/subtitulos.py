@@ -18,6 +18,7 @@ import unicodedata
 
 FIN_FRASE = (".", "?", "!", ",", ";", ":")
 PARECIDO_MIN = 0.5      # parecido mínimo (de 0 a 1) para corregir un tramo con el guion
+PARECIDO_JUNTAS = 0.8   # para cambiar una palabra oída por 2 o 3 del guion que suenan igual juntas
 # Palabras de un número escrito con letras, ya normalizadas (sin tildes): Whisper los escribe con cifras
 NUMERO = re.compile(r"\d+|cero|uno?|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|"
                     r"trece|catorce|quince|dieci\w+|veint\w*|treinta|cuarenta|cincuenta|sesenta|"
@@ -141,13 +142,27 @@ def corregir_con_guion(palabras, guion):
             # Whisper escribe los números con cifras: si el valor es el del guion ("2006" por
             # "dos mil seis"), está bien oído y se deja. Si es otro ("75" por "de treinta y
             # cinco", en 012), lo oyó mal: se pone el texto del guion.
-            numero = [g[0] for g in guion[a1:a2] if es_numero(g[0]) or g[0] == "y"]
+            # "por ciento" no es parte del número: con él, "siete por ciento" valía 700 y el
+            # "7 %" bien oído se cambiaba, dejando el "%" suelto en el subtítulo (014)
+            tramo = [g[0] for g in guion[a1:a2]]
+            numero = [p for k, p in enumerate(tramo) if (es_numero(p) or p == "y")
+                      and not (p == "ciento" and k > 0 and tramo[k - 1] == "por")]
             valor = valor_numero(numero) if any(es_numero(p) for p in numero) else None
             if valor is not None and valor != int(transcritas[b1][1]):
                 i = transcritas[b1][0]
                 antes = palabras[i]["palabra"]
                 palabras[i]["palabra"] = " ".join(g[2] for g in guion[a1:a2])
                 cambios.append(f"«{antes}» -> «{palabras[i]['palabra']}» (número mal oído)")
+            continue
+        if (operacion == "replace" and entre_iguales and b2 - b1 == 1 and 2 <= a2 - a1 <= 3
+                and difflib.SequenceMatcher(None, "".join(g[0] for g in guion[a1:a2]),
+                                            transcritas[b1][1]).ratio() >= PARECIDO_JUNTAS):
+            # Whisper juntó varias palabras en una que suena igual: "el mar te pareció" ->
+            # "el martes pareció" (014). Sin espacios casi coinciden: se pone el guion.
+            i = transcritas[b1][0]
+            antes = palabras[i]["palabra"]
+            palabras[i]["palabra"] = " ".join(g[2] for g in guion[a1:a2])
+            cambios.append(f"«{antes}» -> «{palabras[i]['palabra']}» (palabras juntas)")
             continue
         if operacion != "replace" or a2 - a1 != b2 - b1:
             continue
@@ -198,11 +213,16 @@ def cifra_en_negrita(tramo):
 
 
 def unir_cifras(palabras):
-    """Whisper parte a veces las cifras ("30" y ".000,"): se juntan en una sola palabra."""
+    """Whisper parte a veces las cifras ("30" y ".000,"): se juntan en una sola palabra.
+    También el símbolo que va detrás ("7" y "%"): suelto, caía en el subtítulo siguiente
+    ("CARGAR UN 7" / "% MÁS DE", en 014). Se escribe con espacio, como en español."""
     resultado = []
     for p in palabras:
         if resultado and re.match(r"[.,]\d", p["palabra"]) and re.search(r"\d$", resultado[-1]["palabra"]):
             resultado[-1] = {**resultado[-1], "palabra": resultado[-1]["palabra"] + p["palabra"], "fin": p["fin"]}
+        elif resultado and re.fullmatch(r"\s*[%‰ºª°]\W*", p["palabra"]) and re.search(r"\d$", resultado[-1]["palabra"]):
+            resultado[-1] = {**resultado[-1], "palabra": resultado[-1]["palabra"] + " " + p["palabra"].strip(),
+                             "fin": p["fin"]}
         else:
             resultado.append(dict(p))
     return resultado

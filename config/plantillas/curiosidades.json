@@ -5,7 +5,8 @@
     "margen_inicio": 0.15
   },
   "musica": {
-    "archivo": "data/biblioteca/musica/curiosidad_01.mp3"
+    "archivo": "data/biblioteca/musica/curiosidad_01.mp3",
+    "sonoridad": -16
   },
   "efectos": {
     "automaticos": 3,

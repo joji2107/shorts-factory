@@ -10,7 +10,7 @@ from pathlib import Path
 from pasos.voz import procesar_voz
 from pasos.transcripcion import transcribir
 from pasos.respiros import crear_respiros
-from pasos.clips import en_pantalla, es_foto, medidas, ruta_clip
+from pasos.clips import en_pantalla, es_foto, marcas_de_agua, medidas, ruta_clip
 from pasos.marcas import en_la_transcripcion, flechas_del_guion, leer_marcas, respiros_del_guion
 from pasos.subtitulos import generar_ass, palabras_del_guion
 from pasos.cortes import crear_edl, elegir_efectos
@@ -213,7 +213,8 @@ def crear(nombre, rehacer=None, despues_de_voz=None, al_paso=None):
                 respiros = (json.loads(archivos["respiros"].read_text(encoding="utf-8"))
                             if con_respiros else [])
                 crear_edl(palabras_final, voz_final, edl, biblioteca, config, guion, respiros)
-            generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"])
+            generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"],
+                          marcas_de_agua(RAIZ))
         elif paso == "render":
             # Efectos escritos a mano en la configuración, o elegidos automáticamente
             efectos = anclar_a_palabras(config["efectos"]["lista"], palabras_final)

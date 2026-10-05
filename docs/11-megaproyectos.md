@@ -171,5 +171,43 @@ ya no tumba el servidor.
   en el relleno, pero solo en su tramo libre más largo (`ventana_libre()`), así que su plano bueno
   no se repite. `saltando()` acepta esas ventanas (sin ellas, todo sale como antes).
 
+## Short 014-mediterraneo: marcas de agua, música igualada y subtítulos
+
+Continuación de 010 (por qué el Mediterráneo está tan caliente). Empieza con un clip de TikTok
+nuevo (`lluvia-cataluna-007`, un rayo sobre Barcelona) y usa clips de lluvia de 010. El primer
+render tuvo varios fallos que se arreglaron en el sistema, no solo en la receta:
+
+- **No empezaba con el rayo**: la primera palabra estaba en el 0,46 s y el plano en el 0,36;
+  la regla que lo adelanta al 0 necesitaba empezar antes en el clip, y el plano ya empezaba en
+  su segundo 0. Ahora, en ese caso, el plano se alarga por delante.
+- **Marcas de agua de TikTok sin tapar**: en 010 se desenfocaron a mano sobre el vídeo final,
+  calculando cuándo se veía cada clip. Ahora las cajas de cada clip están en
+  `biblioteca/marcas.json` (en fracciones del fotograma del clip y con los segundos del clip en
+  que se ven) y `generar_fondo` las desenfoca al cortar el clip, con los bordes difuminados.
+  Salen tapadas en cualquier short y en cualquier momento. TikTok salta la marca de sitio hacia
+  el segundo 5 (de la izquierda, a media altura, a abajo a la derecha): en el salto se
+  desenfocan las dos unas décimas.
+- **Música demasiado alta**: el render ponía todas las canciones al mismo volumen (0,25), pero
+  vienen grabadas de -19 a -6 LUFS. `ciencia_01` (-9) sonaba unos 6 dB por encima de la de 010.
+  Ahora `musica.sonoridad` lleva la mediana de la canción a un valor fijo antes del volumen
+  (-16 en la plantilla, solo en recetas nuevas; las antiguas salen igual). Se cambió además a
+  una canción más seria (`misterio_02`, a -17).
+- **Efectos parecidos y seguidos**: un riser al terminar «¿Por qué?» y un whoosh al terminar
+  «bañera», con el respiro en medio. Se dejaron solo dos y distintos: `whoosh_01` en el paso de
+  la lluvia a la playa y `whoosh_02` entrando en el respiro (como en 013).
+- **Costa con edificios**: tres clips de pueblos de Liguria y Amalfi (y uno de Barcelona desde
+  el aire) no quedaban bien; se marcaron como `descartado` y se bajaron dos de mar sin edificios.
+- **Subtítulos**: «el mar te pareció» salió «el martes pareció» (una palabra oída por dos del
+  guion que, juntas, suenan igual: ahora se corrige); «siete por ciento» contaba «ciento» como
+  parte del número (700) y cambiaba un «7 %» bien oído dejando el «%» suelto; y el «%» caía en
+  el subtítulo siguiente («CARGAR UN 7» / «% MÁS DE»): ahora va pegado a su cifra.
+- **`revisar_publicacion.py`**: no encontraba `lluvia_cataluña-003` en el índice. macOS escribe
+  la «ñ» de los nombres de archivo como «n» + tilde aparte (NFD), y el guion como una sola letra
+  (NFC): se ven iguales pero no lo son. Ahora se comparan normalizados. Además daba por buenas
+  las licencias desconocidas («falta», los clips de TikTok): ahora las avisa.
+
+**Comprobación**: 004-elefante sigue dando la misma lista de cortes con semilla (`0228c49c…`) y
+el mismo fondo (`d9c21707…`); la configuración fusionada solo cambia por `musica.sonoridad: null`.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

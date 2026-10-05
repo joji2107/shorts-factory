@@ -16,6 +16,7 @@ Uso: python scripts/revisar_publicacion.py 012-protestas_francia
 import argparse
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from crear_short import RAIZ, cargar_config
@@ -73,22 +74,30 @@ def archivos_usados(nombre):
 
 
 def fichas(archivos, indice):
-    """La línea del índice de cada archivo."""
-    faltan = [archivo for archivo in archivos if archivo not in indice]
+    """La línea del índice de cada archivo. Los nombres se comparan normalizados (NFC): macOS
+    escribe la "ñ" de los nombres de archivo como "n" + tilde aparte, y el guion la escribe
+    como una sola letra (014: "lluvia_cataluña-003" no se encontraba en el índice)."""
+    nfc = lambda texto: unicodedata.normalize("NFC", texto)
+    indice = {nfc(nombre): fila for nombre, fila in indice.items()}
+    faltan = [archivo for archivo in archivos if nfc(archivo) not in indice]
     if faltan:
         raise RuntimeError(f"No están en biblioteca/indice.csv: {', '.join(faltan)}")
-    return [indice[archivo] for archivo in archivos]
+    return [indice[nfc(archivo)] for archivo in archivos]
 
 
-def exigen_atribucion(nombre):
-    """Las filas del índice de los archivos del short cuya licencia obliga a citar al autor
-    allí donde se publica (CC BY). None si el short aún no tiene clips."""
+def licencias_con_problema(nombre):
+    """Las filas del índice de los archivos del short que no se pueden publicar sin más: las
+    que obligan a citar al autor allí donde se publica (CC BY) y las de licencia desconocida
+    ("falta" o vacía: los clips de TikTok de 010 y 014, que antes pasaban como buenas).
+    Devuelve (cc_by, desconocidas), o None si el short aún no tiene clips."""
     clips, musica, efectos = archivos_usados(nombre)
     if not clips:
         return None
     indice = {fila["archivo"]: fila for fila in leer_indice()}
     filas = fichas(clips + musica + efectos, indice)
-    return [fila for fila in filas if fila["licencia"].strip().upper().startswith("CC BY")]
+    licencia = lambda fila: fila["licencia"].strip().lower()
+    return ([fila for fila in filas if licencia(fila).startswith("cc by")],
+            [fila for fila in filas if licencia(fila) in ("", "falta")])
 
 
 def bloques(lineas):
@@ -159,24 +168,31 @@ def main():
         sys.exit(f"No existe {ruta.relative_to(RAIZ)}")
     lineas = ruta.read_text(encoding="utf-8").splitlines()
 
-    atribucion = exigen_atribucion(args.short)
+    revision = licencias_con_problema(args.short)
     problema = False
-    if atribucion is None:
+    if revision is None:
         print("Todavía no hay clips elegidos: las licencias se revisan después del render.")
-    elif atribucion:
-        problema = True
-        print(f"ATENCIÓN: {len(atribucion)} archivos exigen citar al autor (CC BY) y la publicación no lleva créditos:")
-        for fila in atribucion:
-            print(f"  {fila['archivo']}: {fila['licencia']}, de {fila['autor']}")
-        print("Cámbialos por material sin esa obligación o añade su crédito a mano en la publicación.")
     else:
-        print("Licencias: todo el material se puede publicar sin créditos.")
+        atribucion, desconocidas = revision
+        if atribucion:
+            print(f"ATENCIÓN: {len(atribucion)} archivos exigen citar al autor (CC BY) y la publicación no lleva créditos:")
+            for fila in atribucion:
+                print(f"  {fila['archivo']}: {fila['licencia']}, de {fila['autor']}")
+            print("Cámbialos por material sin esa obligación o añade su crédito a mano en la publicación.")
+        if desconocidas:
+            print(f"ATENCIÓN: {len(desconocidas)} archivos no tienen licencia conocida (no se sabe si se pueden usar):")
+            for fila in desconocidas:
+                print(f"  {fila['archivo']}: {fila['fuente']}, de {fila['autor'] or 'autor desconocido'}")
+            print("Publicarlos es decisión tuya: no hay permiso conocido del autor.")
+        problema = bool(atribucion or desconocidas)
+        if not problema:
+            print("Licencias: todo el material se puede publicar sin créditos.")
 
     print("\nMedidas:")
     if informe(lineas):
         sys.exit("\nAlgún texto se pasa del límite de su plataforma.")
     if problema:
-        sys.exit("\nHay material que exige créditos.")
+        sys.exit("\nHay material que exige créditos o sin licencia conocida.")
 
 
 if __name__ == "__main__":

@@ -302,6 +302,12 @@ def segmentos_con_ritmo(palabras, total, fijos, c, duracion_de):
                 # clip) en vez de dejar delante un fogonazo de relleno de un fotograma
                 desde -= inicio - t
                 inicio = t
+            elif (inicio - t < ritmo["relleno_min"] and not segmentos and clip
+                  and desde + (fin - t) <= duracion_de(clip)):
+                # Igual, pero el plano ya empieza en el 0 de su clip (o casi): se alarga por
+                # delante y el clip empieza a la vez que el vídeo. En 014 el rayo del primer
+                # plano dejaba delante 0,37 s de relleno (la primera palabra, en el 0,46)
+                inicio = t
             else:
                 puntos = puntos_de_corte(palabras, inicio, relleno, desde=t)
                 segmentos += [(a, b, None, 0.0) for a, b in zip(puntos, puntos[1:])]

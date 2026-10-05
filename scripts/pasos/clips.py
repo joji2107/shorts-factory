@@ -21,6 +21,7 @@ Se calcula a 2160x3840 y se reduce a 1080x1920: así el movimiento lento no tiem
 o alejar) sale del nombre del archivo, así que dos renders dan el mismo vídeo.
 """
 import hashlib
+import json
 
 from .utilidades import duracion, ejecutar
 
@@ -93,6 +94,41 @@ def filtro_foto(foto, inicio, imagen):
             f"zoompan=z='1+{ZOOM * velocidad:g}*{avance('on')}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':"
             "d=1:s=2160x3840:fps=30,"
             "scale=1080:1920,setsar=1,format=yuv420p")
+
+
+def marcas_de_agua(raiz):
+    """biblioteca/marcas.json ({} si no existe): las marcas de agua de cada clip, para
+    desenfocarlas. {clip: [{"caja": [x, y, ancho, alto], "desde": s, "hasta": s}]}, con la
+    caja en fracciones del fotograma del clip (de 0 a 1, desde arriba a la izquierda) y los
+    segundos del clip en que se ve ("hasta" puede faltar: hasta el final). Es local, como
+    musica.json: los clips de TikTok (010, 014) llevan su marca, que salta de sitio."""
+    ruta = raiz / "biblioteca" / "marcas.json"
+    return json.loads(ruta.read_text(encoding="utf-8")) if ruta.exists() else {}
+
+
+def filtro_marcas(cajas, inicio, largo):
+    """Parte de filtro (antes del encuadre) que desenfoca las marcas de agua que se ven en el
+    corte [inicio, inicio + largo] del clip, con los bordes difuminados para que el parche
+    no se note. "" si no hay ninguna. Con -ss antes de -i, t empieza en 0 en 'inicio'."""
+    partes, n = [], 0
+    for marca in cajas:
+        desde = marca.get("desde", 0) - inicio
+        hasta = (marca["hasta"] - inicio) if marca.get("hasta") is not None else largo + 1
+        if hasta <= 0 or desde >= largo:
+            continue
+        x, y, ancho, alto = marca["caja"]
+        # Alfa que sube de 0 a 255 en los 12 px de cada borde (comillas: la expresión lleva comas)
+        alfa = "255*min(1,min(min(X,W-1-X),min(Y,H-1-Y))/12)"
+        partes.append(
+            f"[v{n}]split[base{n}][m{n}];"
+            f"[m{n}]crop=iw*{ancho}:ih*{alto}:iw*{x}:ih*{y},gblur=sigma=16,format=yuva420p,"
+            f"geq=lum='p(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='{alfa}'[b{n}];"
+            f"[base{n}][b{n}]overlay=main_w*{x}:main_h*{y}:enable='between(t,{max(0, desde):.3f},{hasta:.3f})'"
+            f"[v{n + 1}];")
+        n += 1
+    if not partes:
+        return ""
+    return "null[v0];" + "".join(partes) + f"[v{n}]"
 
 
 def en_pantalla(x, y, ancho, alto, encuadre):
