@@ -15,6 +15,10 @@ ARCHIVO = RAIZ / "config" / "lectura.json"
 
 
 def leer():
+    """Los datos de lectura. Si el archivo no existe (no va a Git: son datos de los shorts, y
+    en un clon nuevo no está), se empieza con 3 palabras por segundo y sin muestras."""
+    if not ARCHIVO.exists():
+        return {"palabras_por_segundo": 3.0, "ultimas_muestras": 5, "muestras": []}
     return json.loads(ARCHIVO.read_text(encoding="utf-8"))
 
 
@@ -33,7 +37,7 @@ def anadir_muestra(short, palabras, segundos):
     ultimas = muestras[-datos["ultimas_muestras"]:]
     datos["muestras"] = muestras
     datos["palabras_por_segundo"] = round(statistics.median(m["palabras"] / m["segundos"] for m in ultimas), 2)
-    # Una muestra por línea: así el diff de Git enseña solo la nueva
+    # Una muestra por línea, para leerlo fácil
     lineas = ",\n    ".join(json.dumps(m, ensure_ascii=False) for m in muestras)
     ARCHIVO.write_text(
         "{\n"

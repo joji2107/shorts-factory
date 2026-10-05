@@ -14,3 +14,12 @@ data/
 # Python
 __pycache__/
 .venv/
+
+# Contenido de los shorts (desde la fase 11 en Git solo va el sistema: código, configuración
+# de la fábrica, documentación). Los archivos siguen en el disco, solo que no se suben.
+# Excepción: 901-prueba_voz, el texto de prueba de la herramienta comparar_voz.py.
+shorts/*
+!shorts/901-prueba_voz/
+biblioteca/indice.csv
+biblioteca/musica.json
+config/lectura.json
