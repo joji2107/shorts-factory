@@ -6,6 +6,9 @@ en la que actúan, y no se leen en voz alta.
   [flecha 0.55 0.25]          una flecha roja pequeña que apunta a ese punto del clip que se
                               ve en ese momento (x e y de 0 a 1, desde arriba a la izquierda),
                               con su sonido; [flecha 0.55 0.25 3] dura 3 s (si no, flechas.segundos)
+  [sonido aullador 3.5 3]     el clip aullador, desde su segundo 3,5, durante 3 s, CON SU SONIDO:
+                              en la voz se mete ese silencio (como un respiro) y la música se
+                              apaga mientras suena. Puede ir al principio o al final del guion.
 
 Para saber en qué momento de la grabación cae cada marca, se cuenta cuántas palabras
 dichas hay antes de ella en el guion y se busca esa posición en la transcripción con la
@@ -16,7 +19,7 @@ import re
 
 from .subtitulos import alinear, palabras_de_texto, seccion_guion, solo_lo_que_se_dice
 
-MARCA = re.compile(r"\[(respiro|plano|flecha)\b([^\]]*)\]", re.I)
+MARCA = re.compile(r"\[(respiro|plano|flecha|sonido)\b([^\]]*)\]", re.I)
 
 
 def leer_marcas(ruta):
@@ -54,20 +57,26 @@ def respiros_del_guion(ruta, segundos_por_defecto):
     return resultado
 
 
-def planos_del_guion(ruta):
-    """[(posicion, clip, desde, largo, contexto)] de las marcas [plano clip desde largo]."""
+def planos_del_guion(ruta, tipo="plano"):
+    """[(posicion, clip, desde, largo, contexto)] de las marcas [plano clip desde largo]
+    (o de las [sonido clip desde largo], con tipo="sonido")."""
     resultado = []
     for m in leer_marcas(ruta):
-        if m["tipo"] != "plano":
+        if m["tipo"] != tipo:
             continue
         try:
             clip, desde, largo = m["argumentos"]
             resultado.append((m["posicion"], clip, float(desde.replace(",", ".")),
                               float(largo.replace(",", ".")), m["contexto"]))
         except ValueError:
-            raise RuntimeError(f"[plano {' '.join(m['argumentos'])}] antes de «{m['contexto']}»: "
-                               "tiene que ser [plano clip desde largo], por ejemplo [plano volcan_03 12.5 6]") from None
+            raise RuntimeError(f"[{tipo} {' '.join(m['argumentos'])}] antes de «{m['contexto']}»: "
+                               f"tiene que ser [{tipo} clip desde largo], por ejemplo [{tipo} volcan_03 12.5 6]") from None
     return resultado
+
+
+def sonidos_del_guion(ruta):
+    """[(posicion, clip, desde, largo, contexto)] de las marcas [sonido clip desde largo]."""
+    return planos_del_guion(ruta, "sonido")
 
 
 def flechas_del_guion(ruta, segundos_por_defecto):

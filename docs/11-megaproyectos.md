@@ -209,5 +209,39 @@ render tuvo varios fallos que se arreglaron en el sistema, no solo en la receta:
 **Comprobación**: 004-elefante sigue dando la misma lista de cortes con semilla (`0228c49c…`) y
 el mismo fondo (`d9c21707…`); la configuración fusionada solo cambia por `musica.sonoridad: null`.
 
+## Short 015-mono_aullador: sonido original, negro, zoom hacia un punto y carrusel
+
+Short con material propio grabado en Costa Rica, con un montaje pedido al detalle: empieza con
+3 s del aullador con su sonido, carrusel rápido de otros animales, 6 s de la manada a todo
+volumen, «El mono aullador» con la pantalla en negro, la foto del aullador dormido con un zoom
+lento hacia él y un bonk, la explicación y 7 s finales del aullador. La fábrica no sabía hacer
+casi nada de eso, así que se añadió:
+
+- **`[sonido clip desde largo]`**: el clip con su audio. Funciona como un respiro (se inserta
+  ese silencio en la voz, así que subtítulos, cortes y efectos se desplazan solos), pero el
+  hueco lo ocupa su clip y el render pone su audio, igualado a `sonidos.sonoridad` (la manada
+  venía a -30 LUFS), con la música apagada. Puede ir al principio o al final del guion.
+- **`negro`**: un clip sin archivo que `generar_fondo` dibuja.
+- **`video.imagen.acercar`**: la foto se acerca hacia un punto, no al centro.
+- **Efectos `al_empezar`**: el bonk suena cuando entra la foto, no al acabar la palabra.
+- **Carrusel**: un plano corto (3 s o menos) puede recortarse hasta 0,5 s si se pisa con el
+  siguiente; antes, por debajo de 2 s era error.
+- **Hoja para leer**: `[sonido]` sale en gris, como un respiro.
+- **Prueba sin grabación**: antes de grabar se simuló la transcripción con las palabras del
+  guion (una cada 0,37 s) para ver la lista de cortes. Salieron dos fallos: el carrusel daba
+  error (de ahí el recorte hasta 0,5 s) y la foto del aullador dormido duraba 2,6 s en vez de
+  unos 5 (el plano siguiente se movió).
+- **Fotos de Commons más pequeñas**: las dos del aullador anunciaban 3840 px y llegaron de 2048
+  (pendiente de revisar en `fuentes/commons.py`).
+
+- **Fallo con la grabación real**: «hay uno» se dijo en 0,3 s y al plano del murciélago solo
+  le quedaba un tercio de segundo: «Se pisan…» y el short paró. Ahora, cuando dos planos de
+  carrusel están demasiado juntos, el segundo entra un poco más tarde (y desde más adelante
+  en su clip) para que el primero dure al menos 0,5 s. Además había 1,2 s de silencio entre
+  el aullido inicial y la primera palabra (lo que se grabó antes de hablar): con un [sonido]
+  al principio, ese silencio se quita y la voz entra 0,3 s después del clip.
+
+**Comprobación**: 004-elefante, misma lista de cortes con semilla y mismo fondo (md5).
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

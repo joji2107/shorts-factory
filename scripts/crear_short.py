@@ -11,7 +11,7 @@ from pasos.voz import procesar_voz
 from pasos.transcripcion import transcribir
 from pasos.respiros import crear_respiros
 from pasos.clips import en_pantalla, es_foto, marcas_de_agua, medidas, ruta_clip
-from pasos.marcas import en_la_transcripcion, flechas_del_guion, leer_marcas, respiros_del_guion
+from pasos.marcas import en_la_transcripcion, flechas_del_guion, leer_marcas, respiros_del_guion, sonidos_del_guion
 from pasos.subtitulos import generar_ass, palabras_del_guion
 from pasos.cortes import crear_edl, elegir_efectos
 from pasos.montaje import generar_fondo, render
@@ -46,7 +46,8 @@ def fusionar(base, cambios):
 
 def anclar_a_palabras(efectos, json_palabras):
     """Los efectos con "palabra" (y "vez", si se repite: 1 la primera) empiezan justo al
-    terminar esa palabra. Así siguen en su sitio aunque se vuelva a grabar la voz;
+    terminar esa palabra (con "al_empezar": true, justo al empezarla: el bonk de 015 suena
+    cuando aparece la foto, que entra con la palabra). Así siguen en su sitio aunque se vuelva a grabar la voz;
     los que llevan "momento" (segundo exacto, en el centro del efecto) no cambian.
     Si el archivo empieza con silencio, se adelanta ese silencio: lo que tiene que
     empezar al terminar la palabra es el sonido, no el archivo."""
@@ -57,7 +58,8 @@ def anclar_a_palabras(efectos, json_palabras):
     resultado = []
     for efecto in efectos:
         if "palabra" in efecto:
-            finales = [p["fin"] for p in palabras if limpia(p["palabra"]) == limpia(efecto["palabra"])]
+            borde = "inicio" if efecto.get("al_empezar") else "fin"
+            finales = [p[borde] for p in palabras if limpia(p["palabra"]) == limpia(efecto["palabra"])]
             vez = efecto.get("vez", 1)
             if len(finales) < vez:
                 # Whisper puede escribirla de otra manera ("1,5 km" por "un kilómetro y medio"):
@@ -68,7 +70,8 @@ def anclar_a_palabras(efectos, json_palabras):
             # render centra cada efecto en su momento: medio efecto después del final de la palabra
             archivo = RAIZ / efecto["archivo"]
             momento = finales[vez - 1] + duracion(archivo) / 2 - silencio_inicial(archivo)
-            print(f"   efecto {Path(efecto['archivo']).name} tras «{efecto['palabra']}» ({finales[vez - 1]:.2f} s)")
+            donde = "al empezar" if borde == "inicio" else "tras"
+            print(f"   efecto {Path(efecto['archivo']).name} {donde} «{efecto['palabra']}» ({finales[vez - 1]:.2f} s)")
             efecto = {**efecto, "momento": momento}
         resultado.append(efecto)
     return resultado
@@ -186,6 +189,7 @@ def crear(nombre, rehacer=None, despues_de_voz=None, al_paso=None):
         avisar(paso)
         if paso == "transcripcion" and despues_de_voz:
             silencios = (sum(s for _, s, _ in respiros_del_guion(guion, config["respiros"]["segundos"]))
+                         + sum(largo for *_, largo, _ in sonidos_del_guion(guion))
                          if con_respiros else 0)
             despues_de_voz(config, duracion(archivos["voz"]) + silencios + config["final"]["cola"])
         necesario = (

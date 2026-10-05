@@ -8,7 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .clips import es_foto, filtro_foto, filtro_marcas, ruta_clip
+from .clips import NEGRO, es_foto, filtro_foto, filtro_marcas, ruta_clip
 from .musica import inicio_musica, leer_energia, respiros_flojos
 from .utilidades import ejecutar, duracion
 
@@ -42,7 +42,11 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c, marcas=None):
         fotogramas = round(largo * 30)
         corte = carpeta / f"corte_{n:02}.mp4"
         ruta = ruta_clip(biblioteca, clip)
-        if es_foto(ruta):
+        if clip == NEGRO:
+            # Pantalla en negro ([plano negro 0 2]): no hay archivo, se dibuja
+            entrada = ["-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30"]
+            filtro = "setsar=1,format=yuv420p"
+        elif es_foto(ruta):
             # Una foto: el tramo de su vídeo virtual (Ken Burns) que empieza en 'inicio'
             entrada = ["-loop", "1", "-framerate", "30", "-i", ruta]
             filtro = filtro_foto(ruta, float(inicio), c["imagen"])
@@ -78,11 +82,21 @@ def subida_en_respiros(subida_db, rampa, tramos):
     return f"volume=eval=frame:volume='1+{factor:.4f}*({envolventes})'"
 
 
-def construir_grafo_audio(total, musica, efectos, subida=None):
+def silencio_en_tramos(rampa, tramos):
+    """Filtro que apaga la música en cada tramo (inicio, fin) de un [sonido]: baja en los
+    'rampa' s de antes, se queda muda en todo el tramo y vuelve en los 'rampa' s de después."""
+    envolventes = "+".join(f"min(clip((t-{a - rampa:.3f})/{rampa},0,1),clip(({b + rampa:.3f}-t)/{rampa},0,1))"
+                           for a, b in tramos)
+    return f"volume=eval=frame:volume='max(0,1-({envolventes}))'"
+
+
+def construir_grafo_audio(total, musica, efectos, subida=None, silencios=None):
     """Grafo de la mezcla de audio, sin normalizar. Entradas: 0 voz, 1 música (si hay),
-    y después los efectos. 'efectos' es una lista de (retraso_ms, volumen).
+    y después los efectos. 'efectos' es una lista de (retraso_ms, volumen) o
+    (retraso_ms, volumen, filtros de más), como los fundidos del audio de un [sonido].
     subida (fábrica 2.0): (dB, rampa, [(inicio, fin)]) para subir la música en los respiros.
-    Sin subida, el grafo es exactamente el de siempre."""
+    silencios: (rampa, [(inicio, fin)]) de los [sonido], donde la música se apaga.
+    Sin subida ni silencios, el grafo es exactamente el de siempre."""
     # La voz se alarga con silencio hasta el final: sidechaincompress termina cuando
     # termina su entrada más corta, y sin esto la música se cortaba al acabar la voz
     # (la cola y el fundido de salida se quedaban mudos).
@@ -101,14 +115,17 @@ def construir_grafo_audio(total, musica, efectos, subida=None):
             # En los respiros la voz calla, el ducking se suelta solo y además la música sube
             partes[-1] = partes[-1].replace("[musica_duck]", "[musica_sin_subida]")
             partes.append(f"[musica_sin_subida]{subida_en_respiros(*subida)}[musica_duck]")
+        if silencios and silencios[1]:
+            partes[-1] = partes[-1].replace("[musica_duck]", "[musica_con_sonidos]")
+            partes.append(f"[musica_con_sonidos]{silencio_en_tramos(*silencios)}[musica_duck]")
         entradas, siguiente = ["[voz]", "[musica_duck]"], 2
     else:
         partes = [f"{voz}[voz]"]
         entradas, siguiente = ["[voz]"], 1
 
-    for n, (retraso, volumen) in enumerate(efectos):
+    for n, (retraso, volumen, *extra) in enumerate(efectos):
         partes.append(
-            f"[{siguiente + n}:a]{FORMATO},volume={volumen},adelay={retraso}:all=1[s{n}]"
+            f"[{siguiente + n}:a]{FORMATO},volume={volumen}{''.join(extra)},adelay={retraso}:all=1[s{n}]"
         )
         entradas.append(f"[s{n}]")
 
@@ -186,7 +203,10 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_
            respiros=(), flechas=()):
     """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos.
     fin_ultima_palabra: segundo en que acaba la última palabra (de la transcripción).
-    respiros: los de respiros.json (fábrica 2.0): la música sube en ellos."""
+    respiros: los de respiros.json (fábrica 2.0): la música sube en ellos. Los que vienen de
+    un [sonido] llevan el audio de su clip, igualado a sonidos.sonoridad, con la música apagada."""
+    sonidos = [x for x in respiros if x.get("sonido")]
+    respiros = [x for x in respiros if not x.get("sonido")]
     tras = config["final"].get("tras_ultima_palabra")
     if fin_ultima_palabra is not None:
         # El vídeo acaba la cola después de la última palabra, no al final de la grabación:
@@ -195,6 +215,8 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_
         total = fin_ultima_palabra + (tras if tras is not None else config["final"]["cola"])
     else:
         total = duracion(voz) + config["final"]["cola"]
+    # Un [sonido] al final (después de la última palabra): el vídeo acaba con él
+    total = max([total] + [x["fin"] for x in sonidos])
     if duracion(fondo) < total - 0.05:   # margen de un fotograma y poco más
         print("   AVISO: el fondo dura menos que la voz. Faltan cortes en la lista.")
 
@@ -239,13 +261,34 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_
         efectos.append((retraso, f"{volumen:.4f}"))
         entradas += ["-i", archivo]
 
+    # El audio original de los clips de los [sonido], igualado a sonidos.sonoridad (vienen
+    # grabados muy bajos o muy altos: la manada de 015, a -30 LUFS) y con fundidos cortos
+    cs = config["sonidos"]
+    for x in sonidos:
+        d = x["sonido"]
+        ruta = ruta_clip(raiz / "data" / "biblioteca" / "video", d["clip"])
+        if d["clip"] == NEGRO or es_foto(ruta):
+            print(f"   AVISO: [sonido {d['clip']}] no tiene audio (es una foto o el negro): suena el silencio")
+            continue
+        corte = ["-ss", f"{d['desde']:.3f}", "-t", f"{d['largo']:.3f}", "-i", ruta]
+        medido = leer_json_final(ejecutar(["ffmpeg", "-hide_banner", "-nostats", *corte, "-vn",
+                                           "-af", "loudnorm=print_format=json", "-f", "null", "-"]).stderr)
+        ajuste = cs["sonoridad"] - float(medido["input_i"])
+        fundidos = (f",afade=t=in:d={cs['fundido']}"
+                    f",afade=t=out:st={max(0.0, d['largo'] - cs['fundido_salida']):.3f}:d={cs['fundido_salida']}")
+        print(f"   sonido de {d['clip']} ({d['desde']:g}-{d['desde'] + d['largo']:g} s) en {x['inicio']:.2f} s: "
+              f"{float(medido['input_i']):.1f} LUFS, ajuste {ajuste:+.1f} dB")
+        efectos.append((round(x["inicio"] * 1000), f"{10 ** (ajuste / 20):.4f}", fundidos))
+        entradas += corte
+
     # 1) Mezcla de audio, todavía sin normalizar
     mezcla_wav = salida.parent / "mezcla.wav"
     r = config["respiros"]
     subida = (r["subida_musica_db"], r["rampa"], [(x["inicio"], x["fin"]) for x in respiros]) if respiros else None
     if musica and subida:
         print(f"   la música sube {r['subida_musica_db']:g} dB en {len(respiros)} respiros")
-    grafo_txt.write_text(construir_grafo_audio(total, musica, efectos, subida), encoding="utf-8")
+    silencios = (cs["rampa_musica"], [(x["inicio"], x["fin"]) for x in sonidos]) if sonidos else None
+    grafo_txt.write_text(construir_grafo_audio(total, musica, efectos, subida, silencios), encoding="utf-8")
     ejecutar([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *entradas,
         "-filter_complex_script", grafo_txt, "-map", "[mezcla]", "-t", f"{total:.3f}",

@@ -50,6 +50,7 @@
     "relajacion_ducking": 400
   },
   "flechas": {"segundos": 2, "alto": 80, "sonido": "data/biblioteca/sfx/ding_01.mp3"},
+  "sonidos": {"sonoridad": -14, "fundido": 0.05, "fundido_salida": 0.4, "rampa_musica": 0.4},
   "respiros": {"activo": false, "segundos": 2.5, "subida_musica_db": 5, "rampa": 0.5},
   "efectos": {
     "volumen": 0.5,

@@ -44,6 +44,8 @@ FPS = 30
 MARGEN = 0.5        # segundos que se saltan entre dos usos de un clip, para no repetir plano
 ANTICIPO = 0.1     # segundos que un plano protagonista empieza antes de su palabra
 PLANO_MIN = 2.0     # segundos que tiene que conservar un plano protagonista acortado para no pisar otro
+PLANO_CORTO = 3.0   # un plano de hasta esto es de carrusel (015): al acortarse le basta CORTO_MIN
+CORTO_MIN = 0.5
 FIN_FRASE = (".", "?", "!")
 PAUSA_SUAVE = (",", ";", ":")
 
@@ -257,10 +259,20 @@ def tramos_fijos(palabras, guion, respiros, total, c, duracion_de):
                 raise RuntimeError(f"{marca}: se sale del clip, que dura {duracion_de(clip):.1f} s")
             inicio = max(0.0, palabras[i]["inicio"] - ANTICIPO)
             for r in respiros:
+                if r.get("sonido"):
+                    continue                    # el hueco de un [sonido] es de su clip
                 # Si la palabra viene justo después de un respiro, el plano empieza con el respiro
                 if (i == 0 or r["inicio"] >= palabras[i - 1]["fin"] - 0.01) and r["fin"] <= palabras[i]["inicio"] + 0.01:
                     inicio = r["inicio"]
             fijos.append((a_fotograma(inicio), a_fotograma(min(inicio + largo, total)), clip, desde, marca))
+    for r in respiros:
+        if r.get("sonido"):
+            # [sonido clip desde largo]: su clip, justo en el hueco que ocupa en la voz
+            s = r["sonido"]
+            marca = f"[sonido {s['clip']} {s['desde']:g} {s['largo']:g}] antes de «{r['antes_de']}»"
+            if s["desde"] + s["largo"] > duracion_de(s["clip"]) + 0.05:
+                raise RuntimeError(f"{marca}: se sale del clip, que dura {duracion_de(s['clip']):.1f} s")
+            fijos.append((a_fotograma(r["inicio"]), a_fotograma(r["fin"]), s["clip"], s["desde"], marca))
     for r in respiros:
         cubierto = any(ini <= r["inicio"] + 0.05 and fin >= r["fin"] - 0.05 for ini, fin, *_ in fijos)
         if not cubierto:
@@ -274,7 +286,20 @@ def tramos_fijos(palabras, guion, respiros, total, c, duracion_de):
     for tramo in fijos:
         if ajustados and tramo[0] < ajustados[-1][1] - 0.001:
             anterior = ajustados[-1]
-            if anterior[2] is None or tramo[0] - anterior[0] < PLANO_MIN:
+            # Un plano corto (PLANO_CORTO o menos: el carrusel de 015, una imagen cada 2-3
+            # palabras) puede quedarse en CORTO_MIN; los protagonistas, en PLANO_MIN
+            corto = anterior[1] - anterior[0] <= PLANO_CORTO + 0.01
+            minimo = CORTO_MIN if corto else PLANO_MIN
+            if (corto and anterior[2] is not None and tramo[0] - anterior[0] < minimo
+                    and tramo[1] - tramo[0] <= PLANO_CORTO + 0.01
+                    and tramo[1] - (anterior[0] + CORTO_MIN) >= CORTO_MIN):
+                # Dos planos de carrusel demasiado juntos (en 015, «hay uno» se dijo en 0,3 s):
+                # el segundo entra más tarde, y desde más adelante en su clip, para que al
+                # primero le queden CORTO_MIN segundos
+                retraso = a_fotograma(anterior[0] + CORTO_MIN) - tramo[0]
+                print(f"   AVISO: {tramo[4]} entra {retraso:.2f} s más tarde para que se vea {anterior[4]}")
+                tramo = (tramo[0] + retraso, tramo[1], tramo[2], tramo[3] + retraso, tramo[4])
+            if anterior[2] is None or tramo[0] - anterior[0] < minimo:
                 raise RuntimeError(f"Se pisan {anterior[4]} y {tramo[4]}: acorta el primero o aleja las marcas")
             print(f"   AVISO: {anterior[4]} se acorta a {tramo[0] - anterior[0]:.1f} s para no pisar {tramo[4]}")
             ajustados[-1] = (anterior[0], tramo[0], *anterior[2:])
@@ -377,6 +402,8 @@ def crear_edl(json_palabras, voz, salida, biblioteca, config, guion=None, respir
         total = palabras[-1]["fin"] + (tras if tras is not None else config["final"]["cola"])
     else:
         total = duracion(voz) + config["final"]["cola"]
+    # Un [sonido] al final (después de la última palabra): el vídeo acaba con él
+    total = max([total] + [r["fin"] for r in respiros if r.get("sonido")])
     if c["ritmo"]["activo"]:
         edl = edl_con_ritmo(palabras, total, guion, list(respiros), biblioteca, c)
     else:

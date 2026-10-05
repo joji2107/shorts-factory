@@ -161,6 +161,15 @@ leen y la hoja para leer las trata sola):
   volcan_03 12 7] Y entonces...`: el plano cubre el silencio y el principio de la frase).
   2 o 3 por short, sin pisarse; el resto es relleno de cortes rápidos (1-2,2 s).
 
+- `[sonido clip desde largo]` (015): el clip **con su sonido original** (un animal, un motor,
+  una explosión): el sistema mete ese silencio en la voz, pone el clip con su audio igualado a
+  `sonidos.sonoridad` (-14; más alto en la receta si se pide) y apaga la música mientras suena.
+  Puede ir al principio (antes de la primera palabra) o al final (detrás de la última). Busca
+  el tramo más fuerte del clip midiendo su sonoridad por segundo (`ebur128`).
+- `[plano negro 0 N]`: pantalla en negro. `video.imagen.acercar: {foto: [x, y]}`: zoom lento
+  hacia ese punto de la foto. Un efecto con `"al_empezar": true` suena al empezar su palabra.
+- Carrusel rápido: planos de 2-3 s cada 2-3 palabras; se recortan solos (hasta 0,5 s).
+
 **Protagonistas**: después de tener el material (paso 3), genera las hojas de fotogramas
 del tema y míralas con Read:
 

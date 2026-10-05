@@ -29,11 +29,15 @@ FPS = 30
 ZOOM = 0.12              # el zoom pasa de 1,00 a 1 + ZOOM a lo largo del vídeo virtual
 PANEO_MAX = 1.0          # recorrido máximo del desplazamiento, en anchos de pantalla
 FORMA_PANEO = 3 / 4      # fotos más anchas que esto se desplazan; las demás, zoom
+NEGRO = "negro"          # clip especial: pantalla en negro ([plano negro 0 2]), sin archivo
 
 
 def ruta_clip(biblioteca, clip):
     """El archivo de un clip: el vídeo si está, si no la foto. biblioteca es
-    data/biblioteca/video; las fotos están en data/biblioteca/imagen."""
+    data/biblioteca/video; las fotos están en data/biblioteca/imagen. El clip "negro" no
+    tiene archivo: devuelve una ruta que no existe y generar_fondo lo dibuja."""
+    if clip == NEGRO:
+        return biblioteca / NEGRO
     video = biblioteca / f"{clip}.mp4"
     if video.is_file():
         return video
@@ -49,6 +53,8 @@ def es_foto(ruta):
 
 def duracion_clip(biblioteca, clip, segundos_imagen):
     """Segundos de un clip: los del vídeo, o los del vídeo virtual de una foto."""
+    if clip == NEGRO:
+        return 3600.0
     ruta = ruta_clip(biblioteca, clip)
     return float(segundos_imagen) if es_foto(ruta) else duracion(ruta)
 
@@ -69,17 +75,36 @@ def velocidad_foto(foto, imagen):
 def filtro_foto(foto, inicio, imagen):
     """Filtro de FFmpeg que convierte la foto (entrada con -loop 1) en el tramo del vídeo
     virtual que empieza en 'inicio'. imagen es video.imagen de la configuración. El avance
-    p va de 0 a 1 a lo largo de imagen["segundos"]."""
+    p va de 0 a 1 a lo largo de imagen["segundos"].
+    Con video.imagen.acercar {foto: [x, y]} (015: el aullador dormido), la foto siempre se
+    acerca, hacia ese punto (de 0 a 1, desde arriba a la izquierda), aunque sea ancha."""
     ancho, alto = medidas(foto)
     sentido = int(hashlib.md5(foto.stem.encode()).hexdigest(), 16) % 2
     total = max(1, round(imagen["segundos"] * FPS))
     velocidad = velocidad_foto(foto, imagen)
+    punto = imagen.get("acercar", {}).get(foto.stem)
 
     def avance(fotograma):
         """p con la variable de FFmpeg que cuenta fotogramas (n en crop, on en zoompan)."""
         p = f"min(1,({round(inicio * FPS)}+{fotograma})/{total})"
         return p if sentido else f"(1-{p})"
 
+    if punto:
+        # La ventana de 2160x3840 se centra en el punto (sin salirse de la foto) y el zoom
+        # va hacia donde queda el punto dentro de ella
+        x, y = punto
+        escala = max(2160 / ancho, 3840 / alto)
+        w, h = ancho * escala, alto * escala
+        cx = min(max(0.0, x * w - 1080), w - 2160)
+        cy = min(max(0.0, y * h - 1920), h - 3840)
+        qx, qy = (x * w - cx) / 2160, (y * h - cy) / 3840
+        p = f"min(1,({round(inicio * FPS)}+on)/{total})"
+        return (f"scale={round(w / 2) * 2}:{round(h / 2) * 2},crop=2160:3840:{cx:.0f}:{cy:.0f},"
+                f"zoompan=z='1+{ZOOM * velocidad:g}*{p}':"
+                f"x='max(0,min(iw-iw/zoom,{qx:.4f}*iw-iw/zoom/2))':"
+                f"y='max(0,min(ih-ih/zoom,{qy:.4f}*ih-ih/zoom/2))':"
+                "d=1:s=2160x3840:fps=30,"
+                "scale=1080:1920,setsar=1,format=yuv420p")
     if ancho / alto > FORMA_PANEO:
         # Desplazamiento: la foto a 3840 de alto y una ventana de 2160 que la recorre
         # (centrado si la foto es muy ancha: como mucho PANEO_MAX pantallas de recorrido)

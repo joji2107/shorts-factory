@@ -68,7 +68,7 @@ def archivos_usados(nombre):
         sonidos = []
     # Una foto se llama <clip>.jpg en el índice; todo lo demás, <clip>.mp4
     return ([f"{clip}.jpg" if (IMAGENES / f"{clip}.jpg").is_file() and not (VIDEOS / f"{clip}.mp4").is_file()
-             else f"{clip}.mp4" for clip in sorted(clips)],
+             else f"{clip}.mp4" for clip in sorted(clips) if clip != "negro"],   # negro: sin archivo
             [Path(musica).name] if musica else [],
             sin_repetir(Path(sonido).name for sonido in sonidos))
 
