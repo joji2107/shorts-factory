@@ -161,8 +161,26 @@ def inicio_automatico(musica, respiros, total, raiz):
     return inicio
 
 
+def crear_flecha(salida, alto):
+    """PNG de una flecha roja con borde blanco, con la punta abajo (en el centro del borde
+    inferior), de 'alto' píxeles. Se dibuja con geq (sin fuentes: con el carácter ⬇ y
+    drawtext salía un rombo con «?»): un mango hasta el 56 % de la altura y una punta.
+    El borde blanco es la forma entera; la parte roja va metida 'm' píxeles por dentro."""
+    ancho, m = round(alto * 0.7), max(2, alto // 16)
+    medio, cuello = ancho / 2, alto * 0.56
+    borde = (f"(lt(abs(X-{medio:.1f}),{ancho * 0.16 + m:.1f})*lt(Y,{cuello + m:.1f})"
+             f"+gte(Y,{cuello - m:.1f})*lt(abs(X-{medio:.1f}),({alto}-Y)*{medio / (alto - cuello):.4f}))")
+    roja = (f"(lt(abs(X-{medio:.1f}),{ancho * 0.16:.1f})*gt(Y,{m})*lt(Y,{cuello:.1f})"
+            f"+gte(Y,{cuello:.1f})*lt(abs(X-{medio:.1f}),({alto - 2 * m}-Y)*{(medio - m) / (alto - 2 * m - cuello):.4f}))")
+    ejecutar(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+              "-i", f"color=c=black@0:s={ancho}x{alto},format=rgba", "-frames:v", "1", "-vf",
+              f"geq=r='if(gt({roja},0),230,255)':g='if(gt({roja},0),25,255)':b='if(gt({roja},0),25,255)'"
+              f":a='255*gt({borde},0)'", salida])
+    return ancho, alto
+
+
 def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_ultima_palabra=None,
-           respiros=()):
+           respiros=(), flechas=()):
     """Mezcla voz, música y efectos, normaliza en dos pasadas y graba los subtítulos.
     fin_ultima_palabra: segundo en que acaba la última palabra (de la transcripción).
     respiros: los de respiros.json (fábrica 2.0): la música sube en ellos."""
@@ -228,9 +246,24 @@ def render(fondo, voz, ass, grafo_txt, salida, raiz, config, lista_efectos, fin_
     ganancia = float(valores["I"]) - float(m["input_i"])
     techo = 10 ** ((float(valores["TP"]) - 1.0) / 20)   # de dB a valor lineal
     audio = f"volume={ganancia:.2f}dB,alimiter=limit={techo:.4f}:level=disabled"
+    # Flechas ([flecha x y] del guion): (inicio, fin, x, y) en la pantalla, con la punta en
+    # (x, y) y un rebote suave. Van antes de los subtítulos, para no taparlos. Sin flechas,
+    # el comando es el de siempre.
+    video, entrada_flecha = f"[0:v]ass={ass}[video]", []
+    if flechas:
+        png = Path(grafo_txt).with_name("flecha.png")
+        ancho, alto = crear_flecha(png, config["flechas"]["alto"])
+        entrada_flecha = ["-loop", "1", "-i", png]
+        cadena, anterior = [], "[0:v]"
+        for n, (inicio, fin, x, y) in enumerate(flechas):
+            rebote = f"{alto * 0.15:.0f}*abs(sin(2*PI*1.5*(t-{inicio:.3f})))"
+            cadena.append(f"{anterior}[2:v]overlay=x={x - ancho / 2:.0f}:y='{y - alto:.0f}-{rebote}'"
+                          f":enable='between(t,{inicio:.3f},{fin:.3f})':shortest=1[f{n}]")
+            anterior = f"[f{n}]"
+        video = ";".join(cadena) + f";{anterior}ass={ass}[video]"
     ejecutar([
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", fondo, "-i", mezcla_wav,
-        "-filter_complex", f"[0:v]ass={ass}[video];[1:a]{audio}[audio]",
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", fondo, "-i", mezcla_wav, *entrada_flecha,
+        "-filter_complex", f"{video};[1:a]{audio}[audio]",
         "-map", "[video]", "-map", "[audio]", "-t", f"{total:.3f}",
         "-c:v", "libx264", "-preset", "medium", "-crf", config["final"]["crf"],
         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",

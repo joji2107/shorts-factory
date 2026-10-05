@@ -40,9 +40,9 @@ ESTILO = """\
 
 def marcar(texto):
     """Texto del guion a HTML: **negrita** en <strong> y (pausa) en gris. De las marcas de
-    montaje (fábrica 2.0), [plano ...] no sale y [respiro] sale en gris: el silencio lo
+    montaje (fábrica 2.0), [plano ...] y [flecha ...] no salen y [respiro] sale en gris: el silencio lo
     pone el sistema, así que no hay que pararse."""
-    texto = re.sub(r"\s*\[plano\b[^\]]*\]", "", texto, flags=re.I)
+    texto = re.sub(r"\s*\[(plano|flecha)\b[^\]]*\]", "", texto, flags=re.I)
     texto = re.sub(r"\[respiro\b[^\]]*\]", "\x00", texto, flags=re.I)
     texto = html.escape(texto, quote=False)
     texto = texto.replace("\x00", '<span class="pausa">(respiro: sigue leyendo normal, el silencio lo pone el sistema)</span>')

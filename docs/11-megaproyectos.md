@@ -145,5 +145,20 @@ ya no tumba el servidor.
 - **Marca `[generico]`**: el plan la proponía, pero en 012 bastó con `[plano]` y la etiqueta
   `generico` del índice (que la saca del relleno automático). Se queda una sola marca.
 
+## Short 013-crawler: flecha, cartelas de la NASA y efectos que no tumban el short
+
+- **Tema**: la pista de esquí cubierta de Shanghái (L+SNOW) no tenía ni un vídeo legal del sitio, así
+  que, como dice la skill, se cambió de tema: el crawler-transporter (la NASA, mucho vídeo).
+- **Flecha** (`[flecha x y]`): una flecha roja pequeña que apunta a algo del clip, con su sonido
+  (`ding_01`). Las coordenadas son del clip y se pasan a la pantalla vertical según el encuadre
+  (`en_pantalla()`); se dibuja con `geq` y se superpone antes de los subtítulos con un rebote.
+  El primer dibujo salía casi sin borde: el borde era más pequeño que la parte roja.
+- **`video.saltar`**: los vídeos de la NASA empiezan con una cartela azul de 5-10 s; la receta dice
+  cuántos segundos no usar de cada clip para el relleno.
+- **Efecto sin su palabra**: si Whisper escribe la palabra de otra forma, el efecto se salta con
+  un aviso en vez de parar todo el short.
+- **Hojas de clips largos**: con vídeos de 5 minutos, una hoja de un fotograma por segundo sería
+  enorme; se miró uno cada 5 s y después los tramos elegidos segundo a segundo.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

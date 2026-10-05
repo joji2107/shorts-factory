@@ -3,6 +3,9 @@ en la que actúan, y no se leen en voz alta.
 
   [respiro 3]                 3 s de silencio en ese hueco (sin número: respiros.segundos)
   [plano volcan_03 12.5 6]    el clip volcan_03, desde su segundo 12,5, durante 6 s
+  [flecha 0.55 0.25]          una flecha roja pequeña que apunta a ese punto del clip que se
+                              ve en ese momento (x e y de 0 a 1, desde arriba a la izquierda),
+                              con su sonido; [flecha 0.55 0.25 3] dura 3 s (si no, flechas.segundos)
 
 Para saber en qué momento de la grabación cae cada marca, se cuenta cuántas palabras
 dichas hay antes de ella en el guion y se busca esa posición en la transcripción con la
@@ -13,7 +16,7 @@ import re
 
 from .subtitulos import alinear, palabras_de_texto, seccion_guion, solo_lo_que_se_dice
 
-MARCA = re.compile(r"\[(respiro|plano)\b([^\]]*)\]", re.I)
+MARCA = re.compile(r"\[(respiro|plano|flecha)\b([^\]]*)\]", re.I)
 
 
 def leer_marcas(ruta):
@@ -64,6 +67,25 @@ def planos_del_guion(ruta):
         except ValueError:
             raise RuntimeError(f"[plano {' '.join(m['argumentos'])}] antes de «{m['contexto']}»: "
                                "tiene que ser [plano clip desde largo], por ejemplo [plano volcan_03 12.5 6]") from None
+    return resultado
+
+
+def flechas_del_guion(ruta, segundos_por_defecto):
+    """[(posicion, x, y, segundos, contexto)] de las marcas [flecha x y] o [flecha x y segundos]."""
+    resultado = []
+    for m in leer_marcas(ruta):
+        if m["tipo"] != "flecha":
+            continue
+        try:
+            numeros = [float(a.replace(",", ".")) for a in m["argumentos"]]
+            x, y = numeros[:2]
+            segundos = numeros[2] if len(numeros) > 2 else segundos_por_defecto
+            if len(numeros) > 3 or not (0 <= x <= 1 and 0 <= y <= 1):
+                raise ValueError
+        except ValueError:
+            raise RuntimeError(f"[flecha {' '.join(m['argumentos'])}] antes de «{m['contexto']}»: tiene que ser "
+                               "[flecha x y] o [flecha x y segundos], con x e y entre 0 y 1") from None
+        resultado.append((m["posicion"], x, y, segundos, m["contexto"]))
     return resultado
 
 

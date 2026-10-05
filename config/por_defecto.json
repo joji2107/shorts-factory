@@ -34,6 +34,7 @@
     "buscar_destellos": false,
     "ritmo": {"activo": false, "relleno_min": 1.0, "relleno_max": 2.2, "plano_max": 9.0},
     "imagen": {"segundos": 8, "velocidad": 1.0, "por_foto": {}},
+    "saltar": {},
     "clips": []
   },
   "musica": {
@@ -47,6 +48,7 @@
     "ataque_ducking": 20,
     "relajacion_ducking": 400
   },
+  "flechas": {"segundos": 2, "alto": 80, "sonido": "data/biblioteca/sfx/ding_01.mp3"},
   "respiros": {"activo": false, "segundos": 2.5, "subida_musica_db": 5, "rampa": 0.5},
   "efectos": {
     "volumen": 0.5,

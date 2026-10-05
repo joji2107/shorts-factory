@@ -130,14 +130,24 @@ def repartir(largos, clips, duraciones):
     return edl, avisos
 
 
-def asignar_clips(puntos, clips, biblioteca, segundos_imagen):
+def saltando(edl, duraciones, saltar, azar=random):
+    """Reparte y desplaza sobre la parte útil de cada clip (sin sus primeros saltar[clip]
+    segundos: la cartela de la NASA, por ejemplo) y después suma ese desfase a los cortes.
+    Sin nada que saltar, el resultado es el de siempre. edl: los largos de los cortes."""
+    utiles = {clip: max(0.0, d - saltar.get(clip, 0)) for clip, d in duraciones.items()}
+    cortes, avisos = repartir(edl, list(duraciones), utiles)
+    cortes = desplazar(cortes, utiles, azar)
+    return [(clip, inicio + saltar.get(clip, 0), largo) for clip, inicio, largo in cortes], avisos
+
+
+def asignar_clips(puntos, clips, biblioteca, segundos_imagen, saltar=None):
     """Mide los clips, los reparte entre los cortes y avisa si falta material."""
     duraciones = {clip: duracion_clip(biblioteca, clip, segundos_imagen) for clip in clips}
     largos = [b - a for a, b in zip(puntos, puntos[1:])]
-    edl, avisos = repartir(largos, clips, duraciones)
+    edl, avisos = saltando(largos, duraciones, saltar or {})
     for aviso in avisos:
         print(f"   AVISO: {aviso}")
-    return desplazar(edl, duraciones)
+    return edl
 
 
 def desplazar(edl, duraciones, azar=random):
@@ -299,10 +309,9 @@ def edl_con_ritmo(palabras, total, guion, respiros, biblioteca, c):
     for clip in relleno:
         duracion_de(clip)
     largos = [fin - inicio for inicio, fin, clip, _ in segmentos if clip is None]
-    edl_relleno, avisos = repartir(largos, relleno, duraciones)
+    edl_relleno, avisos = saltando(largos, {clip: duraciones[clip] for clip in relleno}, c.get("saltar", {}))
     for aviso in avisos:
         print(f"   AVISO: {aviso}")
-    edl_relleno = desplazar(edl_relleno, duraciones)
     if c.get("buscar_destellos"):
         edl_relleno = a_destellos(edl_relleno, biblioteca, duraciones)
 
@@ -332,7 +341,7 @@ def crear_edl(json_palabras, voz, salida, biblioteca, config, guion=None, respir
         edl = edl_con_ritmo(palabras, total, guion, list(respiros), biblioteca, c)
     else:
         puntos = puntos_de_corte(palabras, total, c)
-        edl = asignar_clips(puntos, c["clips"], biblioteca, c["imagen"]["segundos"])
+        edl = asignar_clips(puntos, c["clips"], biblioteca, c["imagen"]["segundos"], c.get("saltar", {}))
         if c.get("buscar_destellos"):
             duraciones = {clip: duracion_clip(biblioteca, clip, c["imagen"]["segundos"]) for clip in c["clips"]}
             edl = a_destellos(edl, biblioteca, duraciones)

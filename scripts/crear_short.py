@@ -10,8 +10,9 @@ from pathlib import Path
 from pasos.voz import procesar_voz
 from pasos.transcripcion import transcribir
 from pasos.respiros import crear_respiros
-from pasos.marcas import leer_marcas, respiros_del_guion
-from pasos.subtitulos import generar_ass
+from pasos.clips import en_pantalla, es_foto, medidas, ruta_clip
+from pasos.marcas import en_la_transcripcion, flechas_del_guion, leer_marcas, respiros_del_guion
+from pasos.subtitulos import generar_ass, palabras_del_guion
 from pasos.cortes import crear_edl, elegir_efectos
 from pasos.montaje import generar_fondo, render
 from pasos.utilidades import duracion, silencio_inicial
@@ -59,8 +60,11 @@ def anclar_a_palabras(efectos, json_palabras):
             finales = [p["fin"] for p in palabras if limpia(p["palabra"]) == limpia(efecto["palabra"])]
             vez = efecto.get("vez", 1)
             if len(finales) < vez:
-                raise RuntimeError(f"La palabra '{efecto['palabra']}' (vez {vez}) del efecto "
-                                   f"{efecto['archivo']} no está en la transcripción")
+                # Whisper puede escribirla de otra manera ("1,5 km" por "un kilómetro y medio"):
+                # sin ese efecto el short sigue saliendo, así que se avisa y se sigue
+                print(f"   AVISO: la palabra '{efecto['palabra']}' (vez {vez}) del efecto "
+                      f"{Path(efecto['archivo']).name} no está en la transcripción: el efecto no suena")
+                continue
             # render centra cada efecto en su momento: medio efecto después del final de la palabra
             archivo = RAIZ / efecto["archivo"]
             momento = finales[vez - 1] + duracion(archivo) / 2 - silencio_inicial(archivo)
@@ -68,6 +72,44 @@ def anclar_a_palabras(efectos, json_palabras):
             efecto = {**efecto, "momento": momento}
         resultado.append(efecto)
     return resultado
+
+
+def situar_flechas(guion, palabras, edl, biblioteca, config):
+    """Las flechas del guion ([flecha x y]) en el vídeo: (inicio, fin, x, y) en la pantalla, y
+    sus sonidos (efectos con "momento", que es el centro del efecto). Cada flecha aparece al
+    empezar la palabra que va detrás de la marca, sobre el clip que se ve en ese momento
+    (según la lista de cortes): x e y son de ese clip y se pasan a la pantalla con su encuadre."""
+    marcas = flechas_del_guion(guion, config["flechas"]["segundos"]) if guion.exists() else []
+    if not marcas:
+        return [], []
+    indices = en_la_transcripcion([m[0] for m in marcas], palabras, palabras_del_guion(guion))
+    tramos, t = [], 0.0                 # (inicio, fin, clip), redondeado a fotogramas como el fondo
+    for linea in edl.read_text(encoding="utf-8").splitlines():
+        campos = linea.split()
+        if campos:
+            largo = round(float(campos[2] if len(campos) > 2 else config["video"]["segundos_corte"]) * 30) / 30
+            tramos.append((t, t + largo, campos[0]))
+            t += largo
+    flechas, sonidos = [], []
+    for (_, x, y, segundos, contexto), i in zip(marcas, indices):
+        if i is None or i >= len(palabras):
+            raise RuntimeError(f"[flecha {x:g} {y:g}] antes de «{contexto}»: no se encuentra en la transcripción")
+        inicio = palabras[i]["inicio"]
+        clip = next((c for a, b, c in tramos if a <= inicio < b), tramos[-1][2])
+        ruta = ruta_clip(biblioteca, clip)
+        ancho, alto = medidas(ruta)
+        if es_foto(ruta):
+            print(f"   AVISO: la flecha antes de «{contexto}» cae sobre una foto que se mueve: su sitio es aproximado")
+        encuadre = "relleno" if es_foto(ruta) else config["video"]["encuadre"]
+        px, py = en_pantalla(x, y, ancho, alto, encuadre)
+        flechas.append((inicio, inicio + segundos, px, py))
+        print(f"   flecha de {inicio:.2f} a {inicio + segundos:.2f} s sobre {clip} ({x:g}, {y:g}) "
+              f"-> pantalla ({px:.0f}, {py:.0f}), antes de «{contexto}»")
+        if config["flechas"].get("sonido"):
+            archivo = RAIZ / config["flechas"]["sonido"]
+            sonidos.append({"archivo": config["flechas"]["sonido"],
+                            "momento": inicio + duracion(archivo) / 2 - silencio_inicial(archivo)})
+    return flechas, sonidos
 
 
 def config_base(version=None):
@@ -180,9 +222,11 @@ def crear(nombre, rehacer=None, despues_de_voz=None, al_paso=None):
             palabras = json.loads(palabras_final.read_text(encoding="utf-8"))
             respiros = (json.loads(archivos["respiros"].read_text(encoding="utf-8"))
                         if con_respiros else [])
+            # Flechas del guion ([flecha x y]): su dibujo y su sonido (si no hay, nada cambia)
+            flechas, sonidos = situar_flechas(guion, palabras, edl, biblioteca, config)
             render(archivos["fondo"], voz_final, archivos["subtitulos"],
-                   trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos,
-                   palabras[-1]["fin"] if palabras else None, respiros)
+                   trabajo / "mezcla.txt", archivos["render"], RAIZ, config, efectos + sonidos,
+                   palabras[-1]["fin"] if palabras else None, respiros, flechas)
 
         rehechos.add(paso)
 

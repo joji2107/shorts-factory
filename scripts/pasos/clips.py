@@ -93,3 +93,15 @@ def filtro_foto(foto, inicio, imagen):
             f"zoompan=z='1+{ZOOM * velocidad:g}*{avance('on')}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':"
             "d=1:s=2160x3840:fps=30,"
             "scale=1080:1920,setsar=1,format=yuv420p")
+
+
+def en_pantalla(x, y, ancho, alto, encuadre):
+    """Dónde cae en la pantalla vertical (1080x1920) el punto (x, y) de un clip de ancho x alto
+    (x e y de 0 a 1, desde arriba a la izquierda), según el encuadre de montaje.py:
+    - "desenfocado": el clip a 1080 de ancho, centrado en vertical (el fondo desenfocado no cuenta);
+    - "relleno": el clip agrandado hasta cubrir la pantalla y recortado por el centro."""
+    if encuadre == "desenfocado":
+        alto_pantalla = 1080 * alto / ancho
+        return x * 1080, (1920 - alto_pantalla) / 2 + y * alto_pantalla
+    escala = max(1080 / ancho, 1920 / alto)
+    return x * ancho * escala - (ancho * escala - 1080) / 2, y * alto * escala - (alto * escala - 1920) / 2
