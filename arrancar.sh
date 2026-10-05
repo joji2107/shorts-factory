@@ -52,6 +52,18 @@ else
     fi
 fi
 
+# 4b. Ventana de progreso (en el Mac): abre la página al dejar una grabación en la bandeja,
+#     avisa si falla y abre el vídeo al terminar. Se guarda su número de proceso para pararla.
+PID_VENTANA=data/estado/ventana.pid
+if [ -f "$PID_VENTANA" ] && kill -0 "$(cat "$PID_VENTANA")" 2>/dev/null; then
+    echo "Ventana de progreso: ya estaba en marcha"
+else
+    mkdir -p data/estado
+    nohup ./ventana_progreso.sh >/dev/null 2>&1 &
+    echo $! > "$PID_VENTANA"
+    echo "Ventana de progreso: en marcha (se abre sola al dejar una grabación en la bandeja)"
+fi
+
 # 5. Estado
 echo
 echo "================ Estado ================"

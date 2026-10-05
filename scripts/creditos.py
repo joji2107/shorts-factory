@@ -83,12 +83,16 @@ def fichas(archivos, indice):
 
 
 def autores_por_fuente(filas):
-    """'A y B (Pixabay); C (Pexels)': cada autor una vez, agrupados por fuente."""
+    """'A y B (Pixabay); C (Pexels)': cada autor una vez, agrupados por fuente. Si la
+    licencia obliga a citarla (CC BY), va con la fuente: 'D (Wikimedia Commons, CC BY 4.0)'."""
     fuentes = {}
     for fila in filas:
-        fuentes.setdefault(fila["fuente"], [])
-        if fila["autor"] not in fuentes[fila["fuente"]]:
-            fuentes[fila["fuente"]].append(fila["autor"])
+        grupo = fila["fuente"]
+        if fila.get("licencia", "").startswith("CC BY"):
+            grupo += f", {fila['licencia']}"
+        fuentes.setdefault(grupo, [])
+        if fila["autor"] not in fuentes[grupo]:
+            fuentes[grupo].append(fila["autor"])
 
     def enumerar(nombres):
         return nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1]
@@ -104,13 +108,26 @@ def textos_de_creditos(nombre):
     indice = {fila["archivo"]: fila for fila in leer_indice()}
     clips, musica, efectos = (fichas(grupo, indice) for grupo in (clips, musica, efectos))
 
+    def linea_clip(fila):
+        # Con atribución (Commons, NASA...) va el texto exacto que pide su licencia
+        tipo = "Foto" if fila["tipo"].strip() == "imagen" else "Vídeo"
+        if fila.get("atribucion", "").strip():
+            return f"{tipo}: {fila['atribucion'].strip()}"
+        return f"{tipo}: {fila['autor']} en {fila['fuente']}, {fila['url']}"
+
     largo = ["Créditos:"]
-    largo += [f"Vídeo: {fila['autor']} en {fila['fuente']}, {fila['url']}" for fila in clips]
+    largo += [linea_clip(fila) for fila in clips]
     largo += [f"Música: {fila['autor']} en {fila['fuente']}, {fila['url']}" for fila in musica]
     if efectos:
         largo.append(f"Efectos de sonido: {autores_por_fuente(efectos)}")
 
-    partes = [f"vídeos de {autores_por_fuente(clips)}"]
+    videos = [fila for fila in clips if fila["tipo"].strip() != "imagen"]
+    fotos = [fila for fila in clips if fila["tipo"].strip() == "imagen"]
+    partes = []
+    if videos:
+        partes.append(f"vídeos de {autores_por_fuente(videos)}")
+    if fotos:
+        partes.append(f"fotos de {autores_por_fuente(fotos)}")
     if musica:
         partes.append(f"música de {autores_por_fuente(musica)}")
     if efectos:

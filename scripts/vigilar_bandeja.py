@@ -22,6 +22,7 @@ from pathlib import Path
 
 import lectura
 import material
+import progreso
 from pasos.marcas import planos_del_guion
 from crear_short import RAIZ, config_base, crear, fusionar
 
@@ -66,7 +67,7 @@ def sugerencia(nombre, tema):
     if parecida:
         return (f". ¿Querías decir {parecida[0]}? Renombra la grabación de data/errores/ "
                 f"y déjala otra vez en la bandeja")
-    temas = {e for fila in material.leer_indice() if fila["tipo"].strip() == "video"
+    temas = {e for fila in material.leer_indice() if fila["tipo"].strip() in material.TIPOS_CLIP
              for e in fila["etiquetas"].strip().split(";") if e}
     parecido = difflib.get_close_matches(tema, sorted(temas), n=1, cutoff=PARECIDO_NOMBRE)
     if parecido:
@@ -100,7 +101,7 @@ def preparar_receta(nombre, audio, plantilla):
     tema = nombre.split("-", 1)[-1]              # "002-caballo" -> "caballo"
     tiene_clips = config.get("video", {}).get("clips")
     if not tiene_clips and not (receta / "cortes.txt").exists() and not material.clips_del_tema(tema):
-        raise RuntimeError(f"No hay vídeos con la etiqueta '{tema}' en biblioteca/indice.csv"
+        raise RuntimeError(f"No hay vídeos ni fotos con la etiqueta '{tema}' en biblioteca/indice.csv"
                            + sugerencia(nombre, tema))
 
     receta.mkdir(parents=True, exist_ok=True)
@@ -146,6 +147,11 @@ def material_despues_de_voz(nombre):
         if estado != "suficiente":
             registrar(f"       AVISO: material {estado} para {total:.1f} s (menos de {material.MIN_CLIPS} "
                       f"clips o se repetirían planos). Usa evaluar_material para ver cuántos faltan")
+        # Las fotos son un recurso más, pero un short solo de fotos queda pobre (en 012 no había
+        # ni un vídeo): se avisa para añadir vídeo real de contexto con [plano] en frases generales
+        if all((material.IMAGENES / f"{clip}.jpg").is_file() for clip in list(clips) + protagonistas):
+            registrar("       AVISO: todo el short son fotos, sin ningún vídeo. Añade vídeo real de "
+                      "contexto (el lugar, la situación general) con [plano] en frases generales")
 
     return comprobar
 
@@ -187,15 +193,18 @@ def procesar(audio, plantilla):
         archivado = ARCHIVO / f"{nombre}_{datetime.now():%Y%m%d-%H%M}{audio.suffix}"
     shutil.move(audio, archivado)   # sale de la bandeja: no se procesa dos veces
     registrar(f"INICIO {nombre}")
+    progreso.empezar(nombre)
     if archivado.name != audio.name:
         registrar(f"       Ya había un {audio.name} archivado: el nuevo se guarda como {archivado.name}")
     inicio = time.perf_counter()
     try:
         preparar_receta(nombre, archivado, plantilla)
         # Audio nuevo: se rehace todo desde la voz
-        final = crear(nombre, rehacer="voz", despues_de_voz=material_despues_de_voz(nombre))
+        final = crear(nombre, rehacer="voz", despues_de_voz=material_despues_de_voz(nombre),
+                      al_paso=progreso.paso)
         destino = REVISION / f"{nombre}.mp4"
         shutil.move(final, destino)            # se mueve: el vídeo no queda duplicado
+        progreso.terminar(destino)
         megas = limpiar(nombre)
         minutos = (time.perf_counter() - inicio) / 60
         registrar(f"OK     {nombre} en {minutos:.1f} min -> {destino.relative_to(RAIZ)} "
@@ -208,6 +217,7 @@ def procesar(audio, plantilla):
         shutil.move(archivado, ERRORES / audio.name)
         (ERRORES / f"{nombre}.log").write_text(traceback.format_exc(), encoding="utf-8")
         registrar(f"ERROR  {nombre}: {error} (detalles en data/errores/{nombre}.log)")
+        progreso.fallar(error, ERRORES / f"{nombre}.log")
 
 
 def main():

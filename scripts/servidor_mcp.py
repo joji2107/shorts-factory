@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -25,6 +26,7 @@ from mcp.server.mcpserver import MCPServer
 
 import material
 import metricas
+from fuentes import AGENTE, FUENTES, ErrorFuente
 
 RAIZ = Path(__file__).resolve().parent.parent
 DATA = RAIZ / "data"
@@ -34,13 +36,10 @@ VIDEOS = DATA / "biblioteca" / "video"
 INDICE = RAIZ / "biblioteca" / "indice.csv"
 EXTENSIONES = {".wav", ".mp3", ".m4a", ".aif", ".aiff"}
 
+IMAGENES = DATA / "biblioteca" / "imagen"
 CACHE = DATA / "cache"
-CADUCIDAD_CACHE = 24 * 60 * 60        # Pixabay exige guardar las búsquedas 24 horas
-MAX_CLIPS = 5                         # y no permite descargas masivas
+MAX_CLIPS = 5                         # Pixabay no permite descargas masivas (y Commons pide calma)
 CLAVE_DE_EJEMPLO = "pega_aqui_tu_clave"
-# Algunos servidores rechazan el User-Agent que urllib pone por defecto
-AGENTE = "fabrica-shorts/1.0 (proyecto personal)"
-API_PIXABAY = "https://pixabay.com/api/videos/"
 
 servidor = MCPServer(
     "fabrica-shorts",
@@ -67,10 +66,12 @@ def _filas_indice():
 
 
 def _temas():
-    """Cuenta cuántos vídeos utilizables hay de cada etiqueta (sin los descartados)."""
+    """Cuenta cuántos clips (vídeos y fotos) auténticos hay de cada etiqueta (sin los
+    descartados ni los genéricos)."""
     contador = Counter()
     for fila in _filas_indice():
-        if fila["tipo"].strip() == "video" and not material.descartado(fila):
+        if fila["tipo"].strip() in material.TIPOS_CLIP and not material.descartado(fila) \
+                and not material.generico(fila):
             contador.update(e for e in fila["etiquetas"].strip().split(";") if e)
     return contador
 
@@ -79,7 +80,7 @@ def _generales_del_tema(tema, filas):
     """Las etiquetas que comparten todos los vídeos de un tema, además del tema
     (por ejemplo, 'animal' y 'mar' para 'pulpo'). Vacío si el tema es nuevo."""
     conjuntos = [fila["etiquetas"].strip().split(";") for fila in filas
-                 if fila["tipo"].strip() == "video" and tema in fila["etiquetas"].strip().split(";")]
+                 if fila["tipo"].strip() in material.TIPOS_CLIP and tema in fila["etiquetas"].strip().split(";")]
     if not conjuntos:
         return []
     return [e for e in conjuntos[0] if e and e != tema and all(e in otro for otro in conjuntos[1:])]
@@ -124,92 +125,21 @@ def _nombres(carpeta, patron="*"):
 
 
 # --- Búsqueda de clips -------------------------------------------------------
-# Cada fuente tiene su función de búsqueda, que devuelve los vídeos en un formato
-# común: {"url": página del vídeo, "autor", "duracion", "versiones": [{"link", "width", "height"}]}.
-# El resto (elegir versión, descargar, numerar y registrar) es igual para todas.
-
-class ErrorFuente(Exception):
-    """Un fallo al hablar con la fuente de clips, con un mensaje pensado para leerlo.
-    Nunca lleva la URL de la petición, porque en Pixabay la clave va dentro."""
-
+# Cada fuente está en su módulo de scripts/fuentes/ (pixabay, commons) y devuelve los
+# resultados en un formato común. El resto (elegir versión, descargar, numerar y registrar)
+# es igual para todas y está aquí.
 
 def _clave(variable):
-    """La clave de la API, o None si no está puesta (o sigue la de ejemplo del .env)."""
+    """La clave (o el contacto) de .env, o None si no está puesta (o sigue la de ejemplo)."""
     clave = os.environ.get(variable, "").strip()
     return clave if clave and clave != CLAVE_DE_EJEMPLO else None
 
 
-def _con_cache(fuente, parametros, pedir):
-    """Devuelve la respuesta guardada si tiene menos de 24 horas; si no, la pide y la guarda.
-    El nombre del archivo es una huella de los parámetros, que no incluyen la clave."""
-    huella = hashlib.sha256(json.dumps(parametros, sort_keys=True).encode()).hexdigest()[:16]
-    archivo = CACHE / fuente / f"{huella}.json"
-    if archivo.exists() and time.time() - archivo.stat().st_mtime < CADUCIDAD_CACHE:
-        try:
-            return json.loads(archivo.read_text(encoding="utf-8"))
-        except ValueError:
-            pass                                       # caché estropeada: se vuelve a pedir
-    datos = pedir()
-    archivo.parent.mkdir(parents=True, exist_ok=True)
-    archivo.write_text(json.dumps(datos), encoding="utf-8")
-    return datos
-
-
-def _pedir_pixabay(clave, parametros):
-    """Hace la petición a la API de Pixabay. La clave viaja en la URL, así que los errores
-    se describen solo por su código y se lanzan fuera del except: así la excepción original
-    (que guarda la URL) no queda enganchada al error que llega a Claude."""
-    url = f"{API_PIXABAY}?{urllib.parse.urlencode({'key': clave, **parametros})}"
-    peticion = urllib.request.Request(url, headers={"User-Agent": AGENTE})
-    try:
-        with urllib.request.urlopen(peticion, timeout=20) as respuesta:
-            return json.load(respuesta)
-    except urllib.error.HTTPError as e:
-        if e.code == 400:
-            problema = "Pixabay rechaza la petición (error 400): lo normal es que PIXABAY_API_KEY no sea válida"
-        elif e.code == 429:
-            problema = "Se ha alcanzado el límite de Pixabay (100 peticiones por minuto): prueba en un rato"
-        else:
-            problema = f"Pixabay ha respondido con el error {e.code}"
-    except (urllib.error.URLError, TimeoutError, OSError):
-        problema = "No se puede conectar con Pixabay (sin red o no responde a tiempo)"
-    except ValueError:
-        problema = "Pixabay ha devuelto una respuesta que no es JSON"
-    raise ErrorFuente(problema)
-
-
-def _buscar_pixabay(clave, busqueda, pagina, id_video=None):
-    """Una página de resultados de Pixabay en el formato común, y si quedan más páginas.
-    Con id_video, solo ese vídeo. "ia": Pixabay lo marca como generado con IA (el campo
-    isAiGenerated no sale en su documentación) o lo dice en sus etiquetas; no es infalible."""
-    por_pagina = 50
-    if id_video:
-        parametros = {"id": id_video}
-    else:
-        parametros = {"q": busqueda, "safesearch": "true", "per_page": por_pagina, "page": pagina}
-    datos = _con_cache("pixabay", parametros, lambda: _pedir_pixabay(clave, parametros))
-    videos = []
-    for video in datos.get("hits", []):
-        tamanos = video.get("videos") or {}
-        versiones = [{"link": v.get("url"), "width": v.get("width"), "height": v.get("height")}
-                     for v in tamanos.values()]
-        etiquetas = (video.get("tags") or "").lower()
-        miniatura = next((tamanos[t].get("thumbnail") for t in ("small", "tiny", "medium")
-                          if tamanos.get(t, {}).get("thumbnail")), None)
-        videos.append({"id": str(video.get("id") or ""), "url": video.get("pageURL") or "",
-                       "autor": video.get("user") or "desconocido", "duracion": video.get("duration") or 0,
-                       "versiones": versiones, "etiquetas": etiquetas, "miniatura": miniatura,
-                       "ia": bool(video.get("isAiGenerated")) or "ai generated" in etiquetas})
-    return videos, pagina * por_pagina < datos.get("totalHits", 0)
-
-
-# Para añadir Pexels: escribir _buscar_pexels(clave, busqueda, pagina, id_video=None) con el mismo
-# formato de salida, añadirla aquí y cambiar FUENTE.
-FUENTES = {
-    "pixabay": {"buscar": _buscar_pixabay, "variable": "PIXABAY_API_KEY", "nombre": "Pixabay",
-                "licencia": "Pixabay Content License", "web": "https://pixabay.com"},
-}
-FUENTE = "pixabay"
+def _fuente(nombre):
+    """La fuente pedida, o un mensaje de error si no existe."""
+    if nombre not in FUENTES:
+        return None, f"Fuente desconocida: '{nombre}'. Hay: {', '.join(FUENTES)}."
+    return FUENTES[nombre], None
 
 
 def _elegir_archivo(versiones):
@@ -230,8 +160,8 @@ def _palabra_clave(busqueda):
 
 
 def _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantidad, orientacion="todas", ids=()):
-    """Los vídeos que se pueden descargar, en orden de preferencia: primero los que no son
-    IA y, entre ellos, los verticales (los horizontales sirven por el fondo desenfocado).
+    """Lo que se puede descargar, en orden de preferencia: primero lo que no es IA y, entre
+    ello, vídeo vertical, vídeo horizontal, foto vertical y foto horizontal.
     Pixabay devuelve también vídeos que solo se parecen a la búsqueda (piedras o cielos
     estrellados al buscar rayos), así que se exige la palabra clave en sus etiquetas.
     Con ids, solo esos vídeos y en ese orden (los ha elegido alguien viendo ver_candidatos)."""
@@ -241,7 +171,7 @@ def _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantid
         url = video["url"].strip().rstrip("/")
         archivo = _elegir_archivo(video["versiones"])
         vertical = archivo is not None and archivo["height"] > archivo["width"]
-        if video["duracion"] < 6:
+        if video["tipo"] == "video" and video["duracion"] < 6:
             saltados["duran menos de 6 s"] += 1
         elif not url or url in ya_registradas:
             saltados["ya estaban en el índice"] += 1
@@ -257,7 +187,7 @@ def _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantid
 
     if ids:
         for id_video in ids:
-            videos, _ = fuente["buscar"](clave, busqueda, 1, id_video)
+            videos, _ = fuente["buscar"](clave, busqueda, 1, id_video, rechazos=saltados)
             if not videos:
                 saltados["ids que no existen"] += 1
             for video in videos:
@@ -266,38 +196,66 @@ def _reunir_candidatos(fuente, clave, busqueda, ya_registradas, saltados, cantid
 
     # Como mucho 3 páginas, que además quedan en caché 24 horas
     for pagina in range(1, 4):
-        videos, hay_mas = fuente["buscar"](clave, busqueda, pagina)
+        videos, hay_mas = fuente["buscar"](clave, busqueda, pagina, rechazos=saltados)
         for video in videos:
-            considerar(video, mirar_etiquetas=True)
+            considerar(video, mirar_etiquetas=fuente["palabra_clave"])
         if sum(not video["ia"] for video, _ in candidatos) >= cantidad or not hay_mas:
             break
-    # sort estable: dentro de cada grupo se mantiene el orden de Pixabay
-    candidatos.sort(key=lambda c: (c[0]["ia"], c[1]["height"] <= c[1]["width"]))
+    # Orden de preferencia: lo que no es IA primero y, dentro, vídeo vertical, vídeo horizontal,
+    # foto vertical, foto horizontal (sort estable: en cada grupo, el orden de la fuente)
+    candidatos.sort(key=lambda c: (c[0]["ia"], (2 if c[0]["tipo"] == "imagen" else 0)
+                                   + (0 if c[1]["height"] > c[1]["width"] else 1)))
     return candidatos
 
 
 def _siguiente_clip(tema, filas):
-    """El siguiente número libre de <tema>_NN.mp4, mirando la carpeta y el índice."""
-    patron = re.compile(rf"{re.escape(tema)}_(\d+)\.mp4")
-    nombres = _nombres(VIDEOS, f"{tema}_*.mp4") + [fila["archivo"].strip() for fila in filas]
+    """El siguiente número libre de <tema>_NN (.mp4 o .jpg), mirando las carpetas y el índice."""
+    patron = re.compile(rf"{re.escape(tema)}_(\d+)\.(mp4|jpg)")
+    nombres = (_nombres(VIDEOS, f"{tema}_*.mp4") + _nombres(IMAGENES, f"{tema}_*.jpg")
+               + [fila["archivo"].strip() for fila in filas])
     numeros = [int(m.group(1)) for m in map(patron.fullmatch, nombres) if m]
     return max(numeros, default=0) + 1
 
 
-def _descargar(url, destino):
-    """Descarga a un .part y lo renombra al terminar: nunca queda un .mp4 a medias
-    ni se sobrescribe un archivo de la biblioteca."""
+def _agente(nombre_fuente, clave):
+    """User-Agent para hablar con la fuente: Wikimedia exige un contacto (en Pixabay la clave
+    no se pone nunca aquí)."""
+    if nombre_fuente == "commons":
+        return f"fabrica-shorts/1.0 ({clave}) python-urllib"
+    return AGENTE
+
+
+def _descargar(url, destino, agente=AGENTE):
+    """Descarga a un .part y lo renombra al terminar: nunca queda un archivo a medias ni se
+    sobrescribe uno de la biblioteca. Si lo descargado no es ya del formato del destino (una
+    foto PNG o TIFF, un vídeo webm de Commons), se convierte con FFmpeg a .jpg o .mp4."""
     if destino.exists():
         raise ErrorFuente(f"{destino.name} ya existe en la biblioteca y no se sobrescribe")
     parcial = destino.with_name(destino.name + ".part")
-    peticion = urllib.request.Request(url, headers={"User-Agent": AGENTE})   # aquí no va la clave
+    peticion = urllib.request.Request(url, headers={"User-Agent": agente})   # aquí no va la clave
     try:
-        with urllib.request.urlopen(peticion, timeout=60) as respuesta, parcial.open("wb") as f:
+        with urllib.request.urlopen(peticion, timeout=120) as respuesta, parcial.open("wb") as f:
             shutil.copyfileobj(respuesta, f, 1024 * 1024)
-        parcial.rename(destino)
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         parcial.unlink(missing_ok=True)
         raise ErrorFuente(f"Falló la descarga de {destino.name}: {e}")
+    extension = urllib.parse.urlparse(url).path.lower().rsplit(".", 1)[-1]
+    mismo_formato = extension in (("jpg", "jpeg") if destino.suffix == ".jpg" else ("mp4",))
+    if mismo_formato:
+        parcial.rename(destino)
+        return
+    # Conversión (sin print: el resultado de FFmpeg se captura)
+    opciones = (["-q:v", "2"] if destino.suffix == ".jpg" else
+                ["-an", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
+                 "-movflags", "+faststart"])
+    convertido = destino.with_name(destino.stem + ".convirtiendo" + destino.suffix)
+    resultado = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", parcial,
+                                *opciones, convertido], capture_output=True, text=True)
+    parcial.unlink(missing_ok=True)
+    if resultado.returncode != 0:
+        convertido.unlink(missing_ok=True)
+        raise ErrorFuente(f"No se ha podido convertir {destino.name} a {destino.suffix}")
+    convertido.rename(destino)
 
 
 def _anadir_al_indice(fila):
@@ -485,24 +443,29 @@ def preparar_short(grabacion: str, tema: str, short: str = "") -> str:
 
 
 @servidor.tool()
-def ver_candidatos(busqueda_en_ingles: str, cantidad: int = 8, orientacion: str = "todas") -> str:
-    """Enseña los vídeos de Pixabay que buscar_clips descargaría, SIN descargarlos a la
-    biblioteca: id, orientación, duración, si Pixabay lo marca como IA, sus etiquetas y su
-    miniatura (guardada en data/cache/miniaturas/ para verla). Sirve para elegir los que
-    de verdad muestran el tema y pasar sus ids a buscar_clips. La primera palabra de la
-    búsqueda tiene que estar en las etiquetas del vídeo. orientacion: 'todas', 'vertical'
-    u 'horizontal' (lo grabado de verdad suele ser horizontal; queda bien por el fondo
-    desenfocado). Como mucho 12 candidatos."""
+def ver_candidatos(busqueda_en_ingles: str, cantidad: int = 8, orientacion: str = "todas",
+                   fuente: str = "pixabay") -> str:
+    """Enseña lo que buscar_clips descargaría, SIN descargarlo a la biblioteca: id, tipo
+    (vídeo o foto), orientación, duración, licencia, si es IA, autor y miniatura (guardada en
+    data/cache/miniaturas/ para verla). Sirve para elegir lo que de verdad muestra el tema (el
+    objeto concreto) y pasar sus ids a buscar_clips. orientacion: 'todas', 'vertical' u
+    'horizontal'. Como mucho 12 candidatos.
+    fuente: 'pixabay' (vídeos; la primera palabra de la búsqueda, en inglés, tiene que estar
+    en sus etiquetas) o 'commons' (Wikimedia Commons, fotos y vídeos; mejor por categoría:
+    'Category:Viaduc de Millau'; solo dominio público, CC0 y CC BY: rechaza BY-SA, NC y ND)."""
     busqueda = busqueda_en_ingles.strip()
     if not busqueda:
         return "Falta la búsqueda en inglés (por ejemplo, 'lightning')."
     if orientacion not in ("todas", "vertical", "horizontal"):
         return "orientacion tiene que ser 'todas', 'vertical' u 'horizontal'."
     cantidad = max(1, min(cantidad, 12))
-    fuente = FUENTES[FUENTE]
+    nombre_fuente = fuente
+    fuente, error = _fuente(nombre_fuente)
+    if error:
+        return error
     clave = _clave(fuente["variable"])
     if not clave:
-        return f"Falta la clave de {fuente['nombre']} en .env ({fuente['variable']}=...)."
+        return f"Falta {fuente['variable']} en .env para usar {fuente['nombre']}."
 
     ya_registradas = {fila["url"].strip().rstrip("/") for fila in _filas_indice()}
     saltados = Counter()
@@ -515,35 +478,45 @@ def ver_candidatos(busqueda_en_ingles: str, cantidad: int = 8, orientacion: str 
     carpeta.mkdir(parents=True, exist_ok=True)
     lineas = []
     for video, archivo in candidatos[:cantidad]:
-        miniatura = carpeta / f"{FUENTE}_{video['id']}.jpg"
+        miniatura = carpeta / f"{nombre_fuente}_{video['id']}.jpg"
         if video["miniatura"] and not miniatura.exists():
             try:                                     # la miniatura no lleva la clave en la url
-                peticion = urllib.request.Request(video["miniatura"], headers={"User-Agent": AGENTE})
+                peticion = urllib.request.Request(video["miniatura"],
+                                                  headers={"User-Agent": _agente(nombre_fuente, clave)})
                 with urllib.request.urlopen(peticion, timeout=20) as respuesta:
                     miniatura.write_bytes(respuesta.read())
             except (urllib.error.URLError, TimeoutError, OSError):
                 pass
         forma = "vertical" if archivo["height"] > archivo["width"] else "horizontal"
-        lineas.append(f"{video['id']}: {forma} {archivo['width']}x{archivo['height']}, {video['duracion']} s"
-                      f"{', IA' if video['ia'] else ''}, de {video['autor']} | {video['etiquetas']}"
+        tipo = "foto" if video["tipo"] == "imagen" else f"vídeo de {video['duracion']} s"
+        lineas.append(f"{video['id']}: {tipo} {forma} {archivo['width']}x{archivo['height']}"
+                      f"{', IA' if video['ia'] else ''}, {video['licencia'] or fuente['licencia']}, "
+                      f"de {video['autor']} | {video['etiquetas'][:80]}"
+                      + (f" | AVISO: {video['avisos']}" if video["avisos"] else "")
                       + (f" | {miniatura.relative_to(RAIZ)}" if miniatura.exists() else ""))
-    partes = [f"Candidatos de '{busqueda}' ({len(lineas)}, primero los que no son IA):"] + (lineas or ["(ninguno)"])
+    partes = [f"Candidatos de '{busqueda}' en {fuente['nombre']} ({len(lineas)}, primero los que no son IA):"]
+    partes += lineas or ["(ninguno)"]
     if saltados:
         partes.append("Descartados: " + ", ".join(f"{n} {motivo}" for motivo, n in saltados.items()))
-    partes.append("Para descargar los elegidos: buscar_clips(tema, ids='id1,id2'). "
-                  "La marca de IA de Pixabay no es infalible: mira las miniaturas.")
+    partes.append(f"Para descargar los elegidos: buscar_clips(tema, ids='id1,id2', fuente='{nombre_fuente}'). "
+                  "Mira las miniaturas: que sea el objeto concreto y no IA.")
     return "\n".join(partes)
 
 
 @servidor.tool()
 def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, etiquetas_generales: str = "",
-                 ids: str = "") -> str:
-    """Descarga vídeos de Pixabay a la biblioteca como <tema>_NN.mp4 y los registra en
-    biblioteca/indice.csv con su licencia. Máximo 5 clips.
+                 ids: str = "", fuente: str = "pixabay") -> str:
+    """Descarga clips a la biblioteca y los registra en biblioteca/indice.csv con su licencia
+    exacta, la url de la licencia y el texto de atribución que pide: vídeos como
+    data/biblioteca/video/<tema>_NN.mp4 y fotos como data/biblioteca/imagen/<tema>_NN.jpg
+    (en el montaje se mueven con efecto Ken Burns). Máximo 5 clips.
+    fuente: 'pixabay' (vídeos) o 'commons' (Wikimedia Commons: fotos y vídeos con dominio
+    público, CC0 o CC BY; mejor buscar por categoría y pasar ids de ver_candidatos).
     Lo mejor es mirar antes ver_candidatos y pasar aquí los ids elegidos ('123,456'): así
     se descarga solo lo que se ha visto que sirve. Sin ids, busca (en inglés: tema 'caballo',
     búsqueda 'horse'; la primera palabra tiene que estar en las etiquetas del vídeo) y se
-    queda con los primeros de 6 s o más, primero los que no son IA y después los verticales.
+    queda con los primeros de 6 s o más, primero los que no son IA y, entre ellos, por este orden:
+    vídeo vertical, vídeo horizontal, foto vertical, foto horizontal.
     Antes, usa evaluar_material para saber cuántos clips faltan y pide solo esos.
     etiquetas_generales: una o dos categorías más amplias que el tema, en singular, sin
     tildes y separadas por punto y coma (caballo -> 'animal'; pulpo -> 'animal;mar').
@@ -555,8 +528,8 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
     lista_ids = [i.strip() for i in ids.split(",") if i.strip()]
     if not re.fullmatch(r"[a-z0-9_]+", tema):
         return "El tema solo puede tener minúsculas sin tildes, números y guiones bajos."
-    if any(not i.isdigit() for i in lista_ids):
-        return "Los ids son los números de ver_candidatos, separados por comas ('123,456')."
+    if any(not re.fullmatch(r"[A-Za-z0-9_.\-]+", i) for i in lista_ids):
+        return "Los ids son los de ver_candidatos, separados por comas ('123,456')."
     if lista_ids:
         cantidad = len(lista_ids)
     elif not busqueda:
@@ -578,11 +551,14 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
         return "Indica una o dos etiquetas generales distintas del tema (por ejemplo 'animal')."
     etiquetas = ";".join([tema] + generales)                       # el tema siempre primero
 
-    fuente = FUENTES[FUENTE]
+    nombre_fuente = fuente
+    fuente, error = _fuente(nombre_fuente)
+    if error:
+        return error
     clave = _clave(fuente["variable"])
     if not clave:
-        return (f"Falta la clave de {fuente['nombre']}: pega tu clave en el archivo .env "
-                f"({fuente['variable']}=...) y vuelve a registrar el servidor MCP con --env-file.")
+        return (f"Falta {fuente['variable']} en el archivo .env para usar {fuente['nombre']}; "
+                f"después hay que volver a conectar el servidor MCP (/mcp) para que la lea.")
 
     ya_registradas = {fila["url"].strip().rstrip("/") for fila in filas}
     saltados = Counter()
@@ -597,18 +573,22 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
 
     # 3. Descargar y registrar uno a uno: lo que ya se ha bajado queda registrado aunque luego falle algo
     VIDEOS.mkdir(parents=True, exist_ok=True)
+    IMAGENES.mkdir(parents=True, exist_ok=True)
     numero = _siguiente_clip(tema, filas)
     anadidos = []
     try:
         for video, archivo in candidatos[:cantidad]:
-            destino = VIDEOS / f"{tema}_{numero:02d}.mp4"
-            _descargar(archivo["link"], destino)
-            _anadir_al_indice([destino.name, "video", fuente["nombre"], video["autor"], video["url"],
-                               fuente["licencia"], date.today().isoformat(),
-                               etiquetas + (";ia" if video["ia"] else "")])
+            es_foto = video["tipo"] == "imagen"
+            destino = (IMAGENES / f"{tema}_{numero:02d}.jpg") if es_foto else (VIDEOS / f"{tema}_{numero:02d}.mp4")
+            _descargar(archivo["link"], destino, _agente(nombre_fuente, clave))
+            licencia = video["licencia"] or fuente["licencia"]
+            _anadir_al_indice([destino.name, video["tipo"], fuente["nombre"], video["autor"], video["url"],
+                               licencia, video["licencia_url"] or fuente["licencia_url"], video["atribucion"],
+                               date.today().isoformat(), etiquetas + (";ia" if video["ia"] else "")])
             forma = "vertical" if archivo["height"] > archivo["width"] else "horizontal"
-            anadidos.append(f"{destino.name}: {archivo['width']}x{archivo['height']} {forma}, "
-                            f"{video['duracion']} s{', IA' if video['ia'] else ''}, de {video['autor']} ({video['url']})")
+            tipo = "foto" if es_foto else f"vídeo de {video['duracion']} s"
+            anadidos.append(f"{destino.name}: {tipo}, {archivo['width']}x{archivo['height']} {forma}, "
+                            f"{licencia}{', IA' if video['ia'] else ''}, de {video['autor']} ({video['url']})")
             numero += 1
     except ErrorFuente as e:
         problema = str(e)
@@ -624,7 +604,8 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
         partes.append(f"Se ha parado por un error: {problema}"
                       + (" (lo descargado antes del error ya está en el índice)." if anadidos else ""))
     partes.append(f"Ahora '{tema}' tiene {_temas()[tema]} clips en total.")
-    partes.append(f"Vídeos de {fuente['nombre']} ({fuente['web']}): conviene citar a los autores en la descripción.")
+    partes.append(f"Material de {fuente['nombre']} ({fuente['web']}): los créditos (creditos.py) citan a cada "
+                  "autor con el texto de atribución del índice.")
     return "\n".join(partes)
 
 

@@ -20,7 +20,7 @@ from collections import Counter
 from pathlib import Path
 
 from crear_short import RAIZ, config_base, fusionar
-from pasos.clips import duracion_clip
+from pasos.clips import duracion_clip, es_foto, medidas, ruta_clip
 from pasos.cortes import repartir
 
 INDICE = RAIZ / "biblioteca" / "indice.csv"
@@ -28,6 +28,8 @@ VIDEOS = RAIZ / "data" / "biblioteca" / "video"
 IMAGENES = RAIZ / "data" / "biblioteca" / "imagen"
 MIN_CLIPS = 6
 DESCARTADO = "descartado"
+GENERICO = "generico"
+TIPOS_CLIP = ("video", "imagen")          # una foto también es un clip (vídeo virtual, Ken Burns)
 
 
 def leer_indice():
@@ -50,13 +52,30 @@ def descartado(fila):
     return DESCARTADO in fila["etiquetas"].strip().split(";")
 
 
+def generico(fila):
+    """Un clip con la etiqueta 'generico' no muestra el objeto concreto del tema (un puente
+    cualquiera, no el de Millau). Nunca entra solo en el montaje: solo con [generico ...]."""
+    return GENERICO in fila["etiquetas"].strip().split(";")
+
+
 def clips_del_tema(tema, filas=None):
-    """Los vídeos del índice con esa etiqueta (nombre sin extensión), sin los descartados."""
+    """Los vídeos y fotos del índice con esa etiqueta (nombre sin extensión), sin los
+    descartados ni los genéricos: el material auténtico del tema."""
     return [
         Path(fila["archivo"]).stem
         for fila in (filas if filas is not None else leer_indice())
-        if fila["tipo"].strip() == "video" and tema in fila["etiquetas"].strip().split(";")
-        and not descartado(fila)
+        if fila["tipo"].strip() in TIPOS_CLIP and tema in fila["etiquetas"].strip().split(";")
+        and not descartado(fila) and not generico(fila)
+    ]
+
+
+def clips_genericos(tema, filas=None):
+    """Los clips genéricos del tema (sin los descartados): solo se usan a mano."""
+    return [
+        Path(fila["archivo"]).stem
+        for fila in (filas if filas is not None else leer_indice())
+        if fila["tipo"].strip() in TIPOS_CLIP and tema in fila["etiquetas"].strip().split(";")
+        and not descartado(fila) and generico(fila)
     ]
 
 
@@ -146,18 +165,30 @@ def clips_que_faltan(durs, total, video):
     return None, tipica
 
 
+def prioridad(clip):
+    """Orden de preferencia de los recursos (lo pidió el usuario): 0 vídeo vertical,
+    1 vídeo horizontal, 2 foto vertical, 3 foto horizontal. Se pasa al siguiente solo
+    cuando lo anterior no alcanza: un short solo de fotos queda pobre (012)."""
+    ruta = ruta_clip(VIDEOS, clip)
+    ancho, alto = medidas(ruta)
+    return (2 if es_foto(ruta) else 0) + (0 if alto > ancho else 1)
+
+
 def elegir_clips(tema, total, config, azar=random, protagonistas=()):
     """Los clips justos para el short: primero los que no son IA (un short hecho solo
-    con clips de IA queda pobre) y, entre ellos, los menos usados (al azar entre los
-    empatados). Devuelve (clips, estado). Si ni con todos es suficiente, usa todos.
-    Los protagonistas (fábrica 2.0) no son relleno: no se eligen aquí."""
+    con clips de IA queda pobre); entre ellos, por prioridad() (vídeo vertical, vídeo
+    horizontal, foto vertical, foto horizontal) y, a igual prioridad, los menos usados
+    (al azar entre los empatados). Como se cogen los mínimos que bastan, las fotos solo
+    entran si los vídeos no alcanzan. Devuelve (clips, estado). Si ni con todos es
+    suficiente, usa todos. Los protagonistas (fábrica 2.0) no son relleno: no se eligen aquí."""
     filas = leer_indice()
     candidatos = [clip for clip in clips_del_tema(tema, filas) if clip not in protagonistas]
     if not candidatos:
         return [], "insuficiente"
     shorts, cortes = usos()
     ia = clips_ia(filas)
-    candidatos.sort(key=lambda clip: (clip in ia, shorts[clip], cortes[clip], azar.random()))
+    orden = {clip: prioridad(clip) for clip in candidatos}
+    candidatos.sort(key=lambda clip: (clip in ia, orden[clip], shorts[clip], cortes[clip], azar.random()))
     durs = duraciones(candidatos)
     for cuantos in range(min(MIN_CLIPS, len(candidatos)), len(candidatos) + 1):
         elegidos = candidatos[:cuantos]

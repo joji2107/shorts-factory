@@ -24,6 +24,40 @@ NUMERO = re.compile(r"\d+|cero|uno?|una|dos|tres|cuatro|cinco|seis|siete|ocho|nu
                     r"setenta|ochenta|noventa|cien|ciento|\w*cientos|quinientos|mil|millon|millones")
 
 
+# Valor de cada palabra de un número escrito con letras (normalizada: sin tildes)
+VALORES = {"cero": 0, "un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+           "siete": 7, "ocho": 8, "nueve": 9, "diez": 10, "once": 11, "doce": 12, "trece": 13, "catorce": 14,
+           "quince": 15, "dieciseis": 16, "diecisiete": 17, "dieciocho": 18, "diecinueve": 19, "veinte": 20,
+           "veintiuno": 21, "veintiun": 21, "veintiuna": 21, "veintidos": 22, "veintitres": 23,
+           "veinticuatro": 24, "veinticinco": 25, "veintiseis": 26, "veintisiete": 27, "veintiocho": 28,
+           "veintinueve": 29, "treinta": 30, "cuarenta": 40, "cincuenta": 50, "sesenta": 60, "setenta": 70,
+           "ochenta": 80, "noventa": 90, "cien": 100, "ciento": 100, "doscientos": 200, "doscientas": 200,
+           "trescientos": 300, "trescientas": 300, "cuatrocientos": 400, "cuatrocientas": 400,
+           "quinientos": 500, "quinientas": 500, "seiscientos": 600, "seiscientas": 600,
+           "setecientos": 700, "setecientas": 700, "ochocientos": 800, "ochocientas": 800,
+           "novecientos": 900, "novecientas": 900}
+
+
+def valor_numero(palabras):
+    """'treinta y cinco' -> 35, 'dos mil seis' -> 2006 (palabras normalizadas). None si
+    alguna no es parte de un número."""
+    total, grupo = 0, 0
+    for palabra in palabras:
+        if palabra == "y":
+            continue
+        if palabra.isdigit():
+            grupo += int(palabra)
+        elif palabra == "mil":
+            total, grupo = total + (grupo or 1) * 1000, 0
+        elif palabra in ("millon", "millones"):
+            total, grupo = (total + (grupo or 1)) * 1_000_000, 0
+        elif palabra in VALORES:
+            grupo += VALORES[palabra]
+        else:
+            return None
+    return total + grupo
+
+
 def color_ass(web):
     """'#FFC93C' -> '3CC9FF'. ASS escribe los colores al revés que la web: azul, verde, rojo."""
     if not re.fullmatch(r"#[0-9A-Fa-f]{6}", web):
@@ -101,12 +135,24 @@ def corregir_con_guion(palabras, guion):
             for (i, _), (_, _, original) in zip(transcritas[b1:b2], guion[a1:a2]):
                 palabras[i]["palabra"] = original
             continue
+        entre_iguales = (0 < n < len(tramos) - 1 and tramos[n - 1][0] == "equal"
+                         and tramos[n + 1][0] == "equal")
+        if operacion == "replace" and entre_iguales and b2 - b1 == 1 and transcritas[b1][1].isdigit():
+            # Whisper escribe los números con cifras: si el valor es el del guion ("2006" por
+            # "dos mil seis"), está bien oído y se deja. Si es otro ("75" por "de treinta y
+            # cinco", en 012), lo oyó mal: se pone el texto del guion.
+            numero = [g[0] for g in guion[a1:a2] if es_numero(g[0]) or g[0] == "y"]
+            valor = valor_numero(numero) if any(es_numero(p) for p in numero) else None
+            if valor is not None and valor != int(transcritas[b1][1]):
+                i = transcritas[b1][0]
+                antes = palabras[i]["palabra"]
+                palabras[i]["palabra"] = " ".join(g[2] for g in guion[a1:a2])
+                cambios.append(f"«{antes}» -> «{palabras[i]['palabra']}» (número mal oído)")
+            continue
         if operacion != "replace" or a2 - a1 != b2 - b1:
             continue
         del_guion = "".join(g[0] for g in guion[a1:a2])
         oido = "".join(limpia for _, limpia in transcritas[b1:b2])
-        entre_iguales = (0 < n < len(tramos) - 1 and tramos[n - 1][0] == "equal"
-                         and tramos[n + 1][0] == "equal")
         parecido = difflib.SequenceMatcher(None, del_guion, oido).ratio()
         if parecido < PARECIDO_MIN and not (entre_iguales and a2 - a1 <= 2):
             continue

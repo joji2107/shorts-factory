@@ -138,6 +138,22 @@ divertidos, y el `desde` en el que empieza lo bueno. Comprueba que `desde + larg
 de la duración del clip. El mejor, para la revelación. Los protagonistas deben ser
 grabaciones reales (no IA).
 
+**Orden de los recursos** (lo pidió el usuario): **vídeo vertical → vídeo horizontal → foto
+vertical → foto horizontal**. Se pasa al siguiente solo cuando no se encuentra nada del anterior:
+busca primero vídeo (Pixabay, vídeos de Commons) del objeto concreto y solo después fotos.
+`ver_candidatos` ya los ordena así y el vigilante elige el relleno con ese orden.
+
+**Fotos y vídeo, mezclados**: las fotos de Commons (con movimiento Ken Burns) son un recurso
+más, pero **un short nunca debe salir solo de fotos** (en 012 no había ni un vídeo y al usuario
+no le gustó; el vigilante lo avisa en el registro). Si el material auténtico del tema son solo
+fotos, busca **vídeo real de contexto** (el lugar: París a vista de dron; la situación general:
+un aula llena) para las frases generales («Empezó cerca de París», «clases de treinta y
+cinco»). Descárgalo con la etiqueta `generico` (añadida al final de sus etiquetas en el índice)
+y ponlo solo con `[plano]` en esas frases: nunca en una frase que describa el hecho concreto, y
+nunca un vídeo de otro sitio presentado como si fuera el de la noticia (protestas de Escocia o
+de Rusia por las de Francia). Las fotos de otra época (2006) también van como `generico`, solo
+en la frase de esa época.
+
 **Música**: además de las reglas de siempre (no repetir en 5 shorts...), solo canciones
 **no planas con subida de 5 dB o más** (tabla de energía de arriba). Con `"inicio":
 "auto"` (lo pone la versión 2.0), la canción empieza en `momento fuerte − segundo de la

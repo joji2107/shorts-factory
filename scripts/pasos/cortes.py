@@ -43,6 +43,7 @@ from .utilidades import duracion, ejecutar
 FPS = 30
 MARGEN = 0.5        # segundos que se saltan entre dos usos de un clip, para no repetir plano
 ANTICIPO = 0.1     # segundos que un plano protagonista empieza antes de su palabra
+PLANO_MIN = 2.0     # segundos que tiene que conservar un plano protagonista acortado para no pisar otro
 FIN_FRASE = (".", "?", "!")
 PAUSA_SUAVE = (",", ";", ":")
 
@@ -238,10 +239,19 @@ def tramos_fijos(palabras, guion, respiros, total, c, duracion_de):
             fijos.append((a_fotograma(r["inicio"]), a_fotograma(r["fin"]), None, 0.0,
                           f"[respiro] antes de «{r['antes_de']}»"))
     fijos.sort()
-    for anterior, siguiente in zip(fijos, fijos[1:]):
-        if siguiente[0] < anterior[1] - 0.001:
-            raise RuntimeError(f"Se pisan {anterior[4]} y {siguiente[4]}: acorta el primero o aleja las marcas")
-    return fijos
+    # Si un plano se pisa con el siguiente (se leyó más rápido de lo previsto), se acorta hasta
+    # donde empieza el otro, mientras le queden PLANO_MIN segundos. Si no, error: hay que mover
+    # las marcas. En 012, la foto de 2006 se comía el principio de la siguiente por 0,7 s.
+    ajustados = []
+    for tramo in fijos:
+        if ajustados and tramo[0] < ajustados[-1][1] - 0.001:
+            anterior = ajustados[-1]
+            if anterior[2] is None or tramo[0] - anterior[0] < PLANO_MIN:
+                raise RuntimeError(f"Se pisan {anterior[4]} y {tramo[4]}: acorta el primero o aleja las marcas")
+            print(f"   AVISO: {anterior[4]} se acorta a {tramo[0] - anterior[0]:.1f} s para no pisar {tramo[4]}")
+            ajustados[-1] = (anterior[0], tramo[0], *anterior[2:])
+        ajustados.append(tramo)
+    return ajustados
 
 
 def segmentos_con_ritmo(palabras, total, fijos, c, duracion_de):
@@ -259,6 +269,11 @@ def segmentos_con_ritmo(palabras, total, fijos, c, duracion_de):
                                  anterior[3] + (inicio - anterior[0]) <= duracion_de(anterior[2]))
             if inicio - t < ritmo["relleno_min"] and cabe:
                 segmentos[-1] = (anterior[0], inicio, anterior[2], anterior[3])
+            elif inicio - t < ritmo["relleno_min"] and not segmentos and clip and desde >= inicio - t:
+                # Un plano casi al principio del vídeo: empieza en el 0 (un poco antes en su
+                # clip) en vez de dejar delante un fogonazo de relleno de un fotograma
+                desde -= inicio - t
+                inicio = t
             else:
                 puntos = puntos_de_corte(palabras, inicio, relleno, desde=t)
                 segmentos += [(a, b, None, 0.0) for a, b in zip(puntos, puntos[1:])]

@@ -25,9 +25,18 @@ aviso_git() {
     fi
 }
 
+parar_ventana() {
+    # La ventana de progreso (ventana_progreso.sh, en el Mac), si está en marcha
+    if [ -f data/estado/ventana.pid ]; then
+        kill "$(cat data/estado/ventana.pid)" 2>/dev/null && echo "Ventana de progreso: parada"
+        rm -f data/estado/ventana.pid
+    fi
+}
+
 # 1. ¿Hay algo que apagar?
 if ! colima status >/dev/null 2>&1; then
     echo "Colima ya está parado: no hay nada que apagar."
+    parar_ventana
     aviso_git
     exit 0
 fi
@@ -81,6 +90,8 @@ if vigilante_en_marcha; then
 else
     echo "Vigilante: no estaba en marcha"
 fi
+
+parar_ventana
 
 # 6. Apagar Colima (también para el servidor MCP de Claude Code, si está abierto)
 echo "Colima: apagando..."

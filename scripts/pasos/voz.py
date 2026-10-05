@@ -39,7 +39,9 @@ def tramos_con_sonido(archivo, umbral):
 
     tramos, desde = [], 0.0
     for comienzo, final in zip(comienzos, finales):
-        if comienzo > desde:
+        # Un "tramo" de menos de 0,03 s es un pico de un instante entre dos silencios, no un
+        # sonido (en 012 había varios de duración cero que partían el silencio tras un clic)
+        if comienzo > desde + 0.03:
             tramos.append((desde, comienzo))
         desde = final
     if desde < total:
@@ -54,14 +56,20 @@ def quitar_ruidos(salida, config):
     medio segundo de silencio entre el ruido y la primera palabra."""
     tramos = tramos_con_sonido(salida, config["umbral"])
     corto = lambda t: t[1] - t[0] <= config["duracion_max"]
+    # Un sonido algo más largo (un clic al darle a grabar, una respiración) también es ruido
+    # si lo separa de la voz un silencio largo: una frase leída no empieza con un sonido
+    # suelto y un segundo callado. En 012 había uno de 0,25 s y 2,9 s de silencio detrás.
+    aislado = lambda t, hueco: t[1] - t[0] <= config.get("aislado_max", 0) and hueco >= config.get("hueco_aislado", 1e9)
     # Un sonido corto es ruido si lo separa un hueco de la voz o si va pegado a otro
     # sonido corto (dos chasquidos seguidos)
     ruido_inicio = ruido_fin = None
-    while len(tramos) > 1 and corto(tramos[0]) and (
-            tramos[1][0] - tramos[0][1] >= config["hueco_min"] or corto(tramos[1])):
+    while len(tramos) > 1 and ((corto(tramos[0]) and (
+            tramos[1][0] - tramos[0][1] >= config["hueco_min"] or corto(tramos[1])))
+            or aislado(tramos[0], tramos[1][0] - tramos[0][1])):
         ruido_inicio = tramos.pop(0)
-    while len(tramos) > 1 and corto(tramos[-1]) and (
-            tramos[-1][0] - tramos[-2][1] >= config["hueco_min"] or corto(tramos[-2])):
+    while len(tramos) > 1 and ((corto(tramos[-1]) and (
+            tramos[-1][0] - tramos[-2][1] >= config["hueco_min"] or corto(tramos[-2])))
+            or aislado(tramos[-1], tramos[-1][0] - tramos[-2][1])):
         ruido_fin = tramos.pop()
     if not ruido_inicio and not ruido_fin:
         return
@@ -119,7 +127,26 @@ def normalizar(salida, config):
     temporal.replace(salida)
 
 
+PICO_MINIMO = -60       # dB: por debajo, la grabación no tiene voz (una voz normal ronda los -10)
+
+
+def comprobar_que_suena(original):
+    """Para con un mensaje claro si la grabación está en silencio. En 012 llegó un .wav de
+    silencio digital (-91 dB: la pista de GarageBand no tenía entrada de micro) y el error
+    salía mucho después, al normalizar, sin explicar nada."""
+    resultado = ejecutar(["ffmpeg", "-hide_banner", "-nostats", "-i", original,
+                          "-af", "volumedetect", "-f", "null", "-"])
+    pico = re.search(r"max_volume:\s*(-?[\d.]+|-inf) dB", resultado.stderr)
+    pico = float(pico.group(1)) if pico and pico.group(1) != "-inf" else float("-inf")
+    if pico < PICO_MINIMO:
+        raise RuntimeError(
+            f"La grabación está en silencio (pico de {pico:.0f} dB): revisa en GarageBand que la "
+            "pista tenga entrada de micro, que el micro elegido sea el bueno y que la pista no "
+            "esté silenciada; después vuelve a exportarla")
+
+
 def procesar_voz(original, salida, config):
+    comprobar_que_suena(original)
     if config["inicio"] == "auto":
         inicio, fin = detectar_voz(original, config.get("umbral_silencio", "-45dB"),
                                    config.get("margen_inicio", 0.3))

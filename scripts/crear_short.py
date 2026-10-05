@@ -96,11 +96,14 @@ def cargar_config(nombre):
     return fusionar(base, propia)
 
 
-def crear(nombre, rehacer=None, despues_de_voz=None):
+def crear(nombre, rehacer=None, despues_de_voz=None, al_paso=None):
     """Crea (o actualiza) el short 'nombre' y devuelve la ruta del vídeo final.
     despues_de_voz(config, segundos) es opcional: se llama cuando la voz ya está lista
     (con la duración real del short: voz + cola) y antes del resto de pasos. El vigilante
-    la usa para elegir o comprobar los clips; puede cambiar config["video"]["clips"]."""
+    la usa para elegir o comprobar los clips; puede cambiar config["video"]["clips"].
+    al_paso(paso, saltado=False) es opcional: se llama al empezar cada paso (el vigilante la
+    usa para la ventana de progreso)."""
+    avisar = al_paso or (lambda paso, saltado=False: None)
     config = cargar_config(nombre)
     receta = RAIZ / "shorts" / nombre
     trabajo = RAIZ / "data" / "shorts" / nombre
@@ -136,7 +139,9 @@ def crear(nombre, rehacer=None, despues_de_voz=None):
     rehechos = set()
     for paso in PASOS:
         if paso == "respiros" and not con_respiros:
+            avisar(paso, saltado=True)
             continue
+        avisar(paso)
         if paso == "transcripcion" and despues_de_voz:
             silencios = (sum(s for _, s, _ in respiros_del_guion(guion, config["respiros"]["segundos"]))
                          if con_respiros else 0)
