@@ -20,11 +20,12 @@ from collections import Counter
 from pathlib import Path
 
 from crear_short import RAIZ, config_base, fusionar
+from pasos.clips import duracion_clip
 from pasos.cortes import repartir
-from pasos.utilidades import duracion
 
 INDICE = RAIZ / "biblioteca" / "indice.csv"
 VIDEOS = RAIZ / "data" / "biblioteca" / "video"
+IMAGENES = RAIZ / "data" / "biblioteca" / "imagen"
 MIN_CLIPS = 6
 DESCARTADO = "descartado"
 
@@ -88,13 +89,17 @@ def usos():
     return shorts, cortes
 
 
-def duraciones(clips):
-    """La duración de cada clip. Se comprueba antes que exista: si ffprobe fallara,
-    ejecutar() imprimiría su error y eso rompería el servidor MCP."""
-    faltan = [clip for clip in clips if not (VIDEOS / f"{clip}.mp4").is_file()]
+def duraciones(clips, segundos_imagen=None):
+    """La duración de cada clip (de una foto, la de su vídeo virtual: video.imagen.segundos).
+    Se comprueba antes que exista: si ffprobe fallara, ejecutar() imprimiría su error y eso
+    rompería el servidor MCP."""
+    faltan = [clip for clip in clips if not ((VIDEOS / f"{clip}.mp4").is_file()
+                                             or (IMAGENES / f"{clip}.jpg").is_file())]
     if faltan:
-        raise RuntimeError(f"Están en el índice pero no en data/biblioteca/video: {', '.join(faltan)}")
-    return {clip: duracion(VIDEOS / f"{clip}.mp4") for clip in clips}
+        raise RuntimeError(f"Están en el índice pero no en data/biblioteca/video ni imagen: {', '.join(faltan)}")
+    if segundos_imagen is None:
+        segundos_imagen = config_base()["video"]["imagen"]["segundos"]
+    return {clip: duracion_clip(VIDEOS, clip, segundos_imagen) for clip in clips}
 
 
 def escenarios(total, video):

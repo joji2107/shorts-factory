@@ -35,6 +35,7 @@ import random
 import re
 import statistics
 
+from .clips import duracion_clip, es_foto, ruta_clip
 from .marcas import en_la_transcripcion, planos_del_guion
 from .subtitulos import palabras_del_guion
 from .utilidades import duracion, ejecutar
@@ -128,9 +129,9 @@ def repartir(largos, clips, duraciones):
     return edl, avisos
 
 
-def asignar_clips(puntos, clips, biblioteca):
+def asignar_clips(puntos, clips, biblioteca, segundos_imagen):
     """Mide los clips, los reparte entre los cortes y avisa si falta material."""
-    duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in clips}
+    duraciones = {clip: duracion_clip(biblioteca, clip, segundos_imagen) for clip in clips}
     largos = [b - a for a, b in zip(puntos, puntos[1:])]
     edl, avisos = repartir(largos, clips, duraciones)
     for aviso in avisos:
@@ -178,8 +179,11 @@ def a_destellos(edl, biblioteca, duraciones, antes=0.4):
     """Mueve cada corte para que empiece 'antes' segundos antes de un destello de su
     clip. Cada destello se usa una vez y dos tramos de un mismo clip no se pisan (con
     MARGEN). Si un clip no tiene destellos libres, el corte se queda donde estaba (o en
-    el primer hueco libre, si ahí pisaría a otro)."""
-    pendientes = {clip: destellos(biblioteca / f"{clip}.mp4") for clip in {clip for clip, _, _ in edl}}
+    el primer hueco libre, si ahí pisaría a otro). Las fotos no tienen destellos."""
+    pendientes = {}
+    for clip in {clip for clip, _, _ in edl}:
+        ruta = ruta_clip(biblioteca, clip)
+        pendientes[clip] = [] if es_foto(ruta) else destellos(ruta)
     usados, resultado, con_rayo = {}, [], 0
 
     def libre(clip, inicio, largo):
@@ -270,10 +274,7 @@ def edl_con_ritmo(palabras, total, guion, respiros, biblioteca, c):
 
     def duracion_de(clip):
         if clip not in duraciones:
-            ruta = biblioteca / f"{clip}.mp4"
-            if not ruta.exists():
-                raise RuntimeError(f"El clip {clip} no está en data/biblioteca/video")
-            duraciones[clip] = duracion(ruta)
+            duraciones[clip] = duracion_clip(biblioteca, clip, c["imagen"]["segundos"])
         return duraciones[clip]
 
     fijos = tramos_fijos(palabras, guion, respiros, total, c, duracion_de)
@@ -316,9 +317,9 @@ def crear_edl(json_palabras, voz, salida, biblioteca, config, guion=None, respir
         edl = edl_con_ritmo(palabras, total, guion, list(respiros), biblioteca, c)
     else:
         puntos = puntos_de_corte(palabras, total, c)
-        edl = asignar_clips(puntos, c["clips"], biblioteca)
+        edl = asignar_clips(puntos, c["clips"], biblioteca, c["imagen"]["segundos"])
         if c.get("buscar_destellos"):
-            duraciones = {clip: duracion(biblioteca / f"{clip}.mp4") for clip in c["clips"]}
+            duraciones = {clip: duracion_clip(biblioteca, clip, c["imagen"]["segundos"]) for clip in c["clips"]}
             edl = a_destellos(edl, biblioteca, duraciones)
     salida.write_text(
         "".join(f"{clip} {inicio:.3f} {largo:.4f}\n" for clip, inicio, largo in edl),

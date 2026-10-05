@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from crear_short import RAIZ, cargar_config
-from material import leer_indice
+from material import IMAGENES, VIDEOS, leer_indice
 
 # Límites comprobados el 2026-10-03. Clave: (sección ##, apartado ###) de publicacion.md.
 # "visible": caracteres que se ven antes de "más"; "url": lo que cuenta cada enlace en X.
@@ -67,7 +67,9 @@ def archivos_usados(nombre):
         sonidos = efectos.get("archivos", [])
     else:
         sonidos = []
-    return ([f"{clip}.mp4" for clip in sorted(clips)],
+    # Una foto se llama <clip>.jpg en el índice; todo lo demás, <clip>.mp4
+    return ([f"{clip}.jpg" if (IMAGENES / f"{clip}.jpg").is_file() and not (VIDEOS / f"{clip}.mp4").is_file()
+             else f"{clip}.mp4" for clip in sorted(clips)],
             [Path(musica).name] if musica else [],
             sin_repetir(Path(sonido).name for sonido in sonidos))
 

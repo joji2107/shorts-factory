@@ -1,6 +1,7 @@
 """Hoja de fotogramas de un clip: un fotograma por segundo en mosaico, con el segundo
-escrito encima. Sirve para elegir los planos protagonistas de la fábrica 2.0 (qué clip y
-desde qué segundo: [plano clip desde largo]) mirando lo que pasa en cada momento.
+escrito encima (de una foto, los de su vídeo virtual: el movimiento Ken Burns). Sirve
+para elegir los planos protagonistas de la fábrica 2.0 (qué clip y desde qué segundo:
+[plano clip desde largo]) mirando lo que pasa en cada momento.
 
 Uso: python hoja_fotogramas.py volcan_01 volcan_03 ...   (o un tema: volcan)
 
@@ -10,7 +11,8 @@ import argparse
 import math
 
 import material
-from crear_short import RAIZ
+from crear_short import RAIZ, config_base
+from pasos.clips import es_foto, filtro_foto, ruta_clip
 from pasos.utilidades import duracion, ejecutar
 
 SALIDA = RAIZ / "data" / "cache" / "fotogramas"
@@ -19,15 +21,27 @@ ALTO = 180          # píxeles de alto de cada fotograma (los verticales salen m
 
 
 def hoja(clip):
-    video = material.VIDEOS / f"{clip}.mp4"
-    if not video.is_file():
-        raise SystemExit(f"No existe data/biblioteca/video/{clip}.mp4")
-    segundos = math.ceil(duracion(video))
+    try:
+        ruta = ruta_clip(material.VIDEOS, clip)
+    except RuntimeError as error:
+        raise SystemExit(str(error))
+    if es_foto(ruta):
+        # Una foto: las hojas enseñan su vídeo virtual (el movimiento que hará en el short)
+        imagen = config_base()["video"]["imagen"]
+        segundos_imagen = imagen["segundos"]
+        segundos = math.ceil(segundos_imagen)
+        # -t antes de -i limita la entrada (la foto se repite sin fin con -loop 1)
+        entrada = ["-loop", "1", "-framerate", "30", "-t", segundos_imagen, "-i", ruta]
+        previo = filtro_foto(ruta, 0.0, imagen) + ","
+    else:
+        segundos = math.ceil(duracion(ruta))
+        entrada = ["-i", ruta]
+        previo = ""
     filas = math.ceil(segundos / COLUMNAS)
     salida = SALIDA / f"{clip}.jpg"
     ejecutar([
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video, "-an",
-        "-vf", (f"fps=1,scale=-2:{ALTO},"
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *entrada, "-an",
+        "-vf", (f"{previo}fps=1,scale=-2:{ALTO},"
                 "drawtext=font='DejaVu Sans':text='%{eif\\:t\\:d} s':x=6:y=6:fontsize=26:"
                 "fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4,"
                 f"tile={COLUMNAS}x{filas}:padding=4:color=black"),
@@ -44,7 +58,8 @@ def main():
 
     clips = []
     for nombre in args.clips:
-        clips += [nombre] if (material.VIDEOS / f"{nombre}.mp4").is_file() else material.clips_del_tema(nombre)
+        es_clip = (material.VIDEOS / f"{nombre}.mp4").is_file() or (material.IMAGENES / f"{nombre}.jpg").is_file()
+        clips += [nombre] if es_clip else material.clips_del_tema(nombre)
     if not clips:
         raise SystemExit(f"Ni clips ni temas con esos nombres: {', '.join(args.clips)}")
     for clip in clips:

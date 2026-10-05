@@ -33,6 +33,7 @@
     "pausa_corte": 0.15,
     "buscar_destellos": false,
     "ritmo": {"activo": false, "relleno_min": 1.0, "relleno_max": 2.2, "plano_max": 9.0},
+    "imagen": {"segundos": 8, "velocidad": 1.0, "por_foto": {}},
     "clips": []
   },
   "musica": {

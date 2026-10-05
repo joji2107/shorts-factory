@@ -8,6 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
+from .clips import es_foto, filtro_foto, ruta_clip
 from .musica import inicio_musica, leer_energia, respiros_flojos
 from .utilidades import ejecutar, duracion
 
@@ -37,10 +38,18 @@ def generar_fondo(edl, biblioteca, carpeta, salida, c):
         largo = float(campos[2]) if len(campos) > 2 else c["segundos_corte"]
         fotogramas = round(largo * 30)
         corte = carpeta / f"corte_{n:02}.mp4"
+        ruta = ruta_clip(biblioteca, clip)
+        if es_foto(ruta):
+            # Una foto: el tramo de su vídeo virtual (Ken Burns) que empieza en 'inicio'
+            entrada = ["-loop", "1", "-framerate", "30", "-i", ruta]
+            filtro = filtro_foto(ruta, float(inicio), c["imagen"])
+        else:
+            entrada = ["-ss", inicio, "-i", ruta]
+            filtro = ENCUADRES[c["encuadre"]]
         ejecutar([
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-ss", inicio, "-i", biblioteca / f"{clip}.mp4", "-frames:v", fotogramas,
-            "-vf", ENCUADRES[c["encuadre"]],
+            *entrada, "-frames:v", fotogramas,
+            "-vf", filtro,
             "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
             corte,
         ])
