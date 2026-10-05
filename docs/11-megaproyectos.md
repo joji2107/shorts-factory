@@ -160,5 +160,16 @@ ya no tumba el servidor.
 - **Hojas de clips largos**: con vídeos de 5 minutos, una hoja de un fotograma por segundo sería
   enorme; se miró uno cada 5 s y después los tramos elegidos segundo a segundo.
 
+## 013 con planos verticales y relleno sin repeticiones
+
+- **Vertical**: la NASA tenía un vídeo vertical (1080x1920) de la luna llena detrás del cohete de
+  Artemis II en la plataforma (febrero de 2026) y fotos verticales del crawler CT-2 (enero de 2026).
+  Entraron como planos en «la vuelta a la Luna», «Pesa unas tres mil toneladas» y «Siete
+  kilómetros…»; las fotos, con Ken Burns.
+- **Relleno repetido**: el relleno no podía usar los clips protagonistas, y con los dos clips que
+  quedaban (uno de 6 s útiles) repitió el mismo tramo 5 veces. Ahora un protagonista también entra
+  en el relleno, pero solo en su tramo libre más largo (`ventana_libre()`), así que su plano bueno
+  no se repite. `saltando()` acepta esas ventanas (sin ellas, todo sale como antes).
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

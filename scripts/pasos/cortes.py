@@ -130,14 +130,32 @@ def repartir(largos, clips, duraciones):
     return edl, avisos
 
 
-def saltando(edl, duraciones, saltar, azar=random):
-    """Reparte y desplaza sobre la parte útil de cada clip (sin sus primeros saltar[clip]
-    segundos: la cartela de la NASA, por ejemplo) y después suma ese desfase a los cortes.
-    Sin nada que saltar, el resultado es el de siempre. edl: los largos de los cortes."""
-    utiles = {clip: max(0.0, d - saltar.get(clip, 0)) for clip, d in duraciones.items()}
+def saltando(edl, duraciones, saltar, azar=random, ventanas=None):
+    """Reparte y desplaza sobre la parte útil de cada clip y después suma su comienzo a los
+    cortes. La parte útil es la ventana (inicio, fin) de 'ventanas' si el clip la tiene (la
+    parte libre de un clip protagonista) o, si no, el clip sin sus primeros saltar[clip]
+    segundos (la cartela de la NASA, por ejemplo). Sin nada que saltar ni ventanas, el
+    resultado es el de siempre. edl: los largos de los cortes."""
+    ventanas = ventanas or {}
+    rango = {clip: ventanas.get(clip, (saltar.get(clip, 0), d)) for clip, d in duraciones.items()}
+    utiles = {clip: max(0.0, fin - inicio) for clip, (inicio, fin) in rango.items()}
     cortes, avisos = repartir(edl, list(duraciones), utiles)
     cortes = desplazar(cortes, utiles, azar)
-    return [(clip, inicio + saltar.get(clip, 0), largo) for clip, inicio, largo in cortes], avisos
+    return [(clip, inicio + rango[clip][0], largo) for clip, inicio, largo in cortes], avisos
+
+
+def ventana_libre(duracion, inicio_util, ocupados, minimo):
+    """El tramo libre más largo de un clip (desde inicio_util hasta el final), fuera de los
+    tramos ocupados por sus planos protagonistas [(desde, hasta)]. None si no llega a 'minimo'."""
+    libres, t = [], inicio_util
+    for desde, hasta in sorted(ocupados):
+        if desde > t:
+            libres.append((t, min(desde, duracion)))
+        t = max(t, hasta)
+    if t < duracion:
+        libres.append((t, duracion))
+    mejor = max(libres, key=lambda v: v[1] - v[0], default=None)
+    return mejor if mejor and mejor[1] - mejor[0] >= minimo else None
 
 
 def asignar_clips(puntos, clips, biblioteca, segundos_imagen, saltar=None):
@@ -305,11 +323,27 @@ def edl_con_ritmo(palabras, total, guion, respiros, biblioteca, c):
     fijos = tramos_fijos(palabras, guion, respiros, total, c, duracion_de)
     segmentos = segmentos_con_ritmo(palabras, total, fijos, c, duracion_de)
     protagonistas = {clip for _, _, clip, _, _ in fijos if clip}
-    relleno = [clip for clip in c["clips"] if clip not in protagonistas] or c["clips"]
+    # Un clip protagonista también sirve de relleno, pero solo en su tramo libre más largo
+    # (fuera de sus planos, con MARGEN y un segundo más por si el plano se alarga): así no se
+    # repite su plano bueno. En 013 el relleno se quedó con dos clips cortos y repitió el
+    # mismo tramo 5 veces, con más de 500 s sin usar en los dos clips protagonistas.
+    saltar, ventanas, relleno = c.get("saltar", {}), {}, []
+    for clip in c["clips"]:
+        if clip in protagonistas:
+            ocupados = [(desde - MARGEN, desde + (fin - inicio) + MARGEN + 1.0)
+                        for inicio, fin, otro, desde, _ in fijos if otro == clip]
+            ventana = ventana_libre(duracion_de(clip), saltar.get(clip, 0), ocupados,
+                                    2 * c["ritmo"]["relleno_max"])
+            if ventana is None:
+                continue
+            ventanas[clip] = ventana
+        relleno.append(clip)
+    relleno = relleno or c["clips"]
     for clip in relleno:
         duracion_de(clip)
     largos = [fin - inicio for inicio, fin, clip, _ in segmentos if clip is None]
-    edl_relleno, avisos = saltando(largos, {clip: duraciones[clip] for clip in relleno}, c.get("saltar", {}))
+    edl_relleno, avisos = saltando(largos, {clip: duraciones[clip] for clip in relleno}, saltar,
+                                   ventanas=ventanas)
     for aviso in avisos:
         print(f"   AVISO: {aviso}")
     if c.get("buscar_destellos"):
