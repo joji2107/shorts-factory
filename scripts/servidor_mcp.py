@@ -9,6 +9,7 @@ que aquí nunca se usa print(): cualquier texto suelto rompería la comunicació
 """
 import csv
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -130,7 +131,10 @@ def _nombres(carpeta, patron="*"):
 # es igual para todas y está aquí.
 
 def _clave(variable):
-    """La clave (o el contacto) de .env, o None si no está puesta (o sigue la de ejemplo)."""
+    """La clave (o el contacto) de .env, o None si no está puesta (o sigue la de ejemplo).
+    Una fuente sin variable (la NASA) no necesita clave: devuelve "-"."""
+    if not variable:
+        return "-"
     clave = os.environ.get(variable, "").strip()
     return clave if clave and clave != CLAVE_DE_EJEMPLO else None
 
@@ -451,8 +455,10 @@ def ver_candidatos(busqueda_en_ingles: str, cantidad: int = 8, orientacion: str 
     objeto concreto) y pasar sus ids a buscar_clips. orientacion: 'todas', 'vertical' u
     'horizontal'. Como mucho 12 candidatos.
     fuente: 'pixabay' (vídeos; la primera palabra de la búsqueda, en inglés, tiene que estar
-    en sus etiquetas) o 'commons' (Wikimedia Commons, fotos y vídeos; mejor por categoría:
-    'Category:Viaduc de Millau'; solo dominio público, CC0 y CC BY: rechaza BY-SA, NC y ND)."""
+    en sus etiquetas), 'commons' (Wikimedia Commons, fotos y vídeos; mejor por categoría:
+    'Category:Viaduc de Millau'; solo dominio público y CC0, porque los shorts van sin
+    créditos) o 'nasa' (vídeos y fotos de la NASA, solo para temas de la NASA: cohetes,
+    plataformas, el VAB...; rechaza lo de terceros)."""
     busqueda = busqueda_en_ingles.strip()
     if not busqueda:
         return "Falta la búsqueda en inglés (por ejemplo, 'lightning')."
@@ -485,8 +491,8 @@ def ver_candidatos(busqueda_en_ingles: str, cantidad: int = 8, orientacion: str 
                                                   headers={"User-Agent": _agente(nombre_fuente, clave)})
                 with urllib.request.urlopen(peticion, timeout=20) as respuesta:
                     miniatura.write_bytes(respuesta.read())
-            except (urllib.error.URLError, TimeoutError, OSError):
-                pass
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError, http.client.HTTPException):
+                pass                                 # la miniatura es opcional: se sigue sin ella
         forma = "vertical" if archivo["height"] > archivo["width"] else "horizontal"
         tipo = "foto" if video["tipo"] == "imagen" else f"vídeo de {video['duracion']} s"
         lineas.append(f"{video['id']}: {tipo} {forma} {archivo['width']}x{archivo['height']}"
@@ -510,8 +516,9 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
     exacta, la url de la licencia y el texto de atribución que pide: vídeos como
     data/biblioteca/video/<tema>_NN.mp4 y fotos como data/biblioteca/imagen/<tema>_NN.jpg
     (en el montaje se mueven con efecto Ken Burns). Máximo 5 clips.
-    fuente: 'pixabay' (vídeos) o 'commons' (Wikimedia Commons: fotos y vídeos con dominio
-    público, CC0 o CC BY; mejor buscar por categoría y pasar ids de ver_candidatos).
+    fuente: 'pixabay' (vídeos), 'commons' (Wikimedia Commons: fotos y vídeos con dominio
+    público o CC0; mejor buscar por categoría) o 'nasa' (vídeos y fotos de la NASA, solo para
+    temas de la NASA). Lo mejor es pasar los ids de ver_candidatos.
     Lo mejor es mirar antes ver_candidatos y pasar aquí los ids elegidos ('123,456'): así
     se descarga solo lo que se ha visto que sirve. Sin ids, busca (en inglés: tema 'caballo',
     búsqueda 'horse'; la primera palabra tiene que estar en las etiquetas del vídeo) y se
@@ -528,7 +535,7 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
     lista_ids = [i.strip() for i in ids.split(",") if i.strip()]
     if not re.fullmatch(r"[a-z0-9_]+", tema):
         return "El tema solo puede tener minúsculas sin tildes, números y guiones bajos."
-    if any(not re.fullmatch(r"[A-Za-z0-9_.\-]+", i) for i in lista_ids):
+    if any(not re.fullmatch(r"[A-Za-z0-9_.\- ]+", i) for i in lista_ids):        # los nasa_id llevan a veces espacios
         return "Los ids son los de ver_candidatos, separados por comas ('123,456')."
     if lista_ids:
         cantidad = len(lista_ids)
@@ -604,8 +611,8 @@ def buscar_clips(tema: str, busqueda_en_ingles: str = "", cantidad: int = 4, eti
         partes.append(f"Se ha parado por un error: {problema}"
                       + (" (lo descargado antes del error ya está en el índice)." if anadidos else ""))
     partes.append(f"Ahora '{tema}' tiene {_temas()[tema]} clips en total.")
-    partes.append(f"Material de {fuente['nombre']} ({fuente['web']}): los créditos (creditos.py) citan a cada "
-                  "autor con el texto de atribución del índice.")
+    partes.append(f"Material de {fuente['nombre']} ({fuente['web']}): su licencia y su autor quedan en "
+                  "biblioteca/indice.csv (los shorts se publican sin créditos).")
     return "\n".join(partes)
 
 

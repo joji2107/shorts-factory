@@ -13,8 +13,9 @@ porque Commons tiene muchas más fotos que vídeos.
 | Parte | Qué se hizo | Commit |
 |---|---|---|
 | 1 | Fotos como clips (Ken Burns): `pasos/clips.py` | `c374c9a` |
-| 2 y 3 | Índice con licencia y atribución, fotos en el índice, `generico`, fuente Wikimedia Commons (`scripts/fuentes/`), ventana de progreso, arreglos de voz, planos y números (short 012) | |
-| — | Orden de recursos (vídeo antes que foto) y Git solo con el sistema | |
+| 2 y 3 | Índice con licencia y atribución, fotos en el índice, `generico`, fuente Wikimedia Commons (`scripts/fuentes/`), ventana de progreso, arreglos de voz, planos y números (short 012) | `0d451a9` |
+| — | Orden de recursos (vídeo antes que foto) y Git solo con el sistema | `5b56c84` |
+| 3b, 4 y 5 | Fuente NASA, publicación sin créditos (`revisar_publicacion.py`), skill con temas y material primero, `shorts/ideas.md` | |
 
 ---
 
@@ -114,6 +115,35 @@ nada y, por debajo de -60 dB, para diciendo qué revisar en GarageBand.
   `biblioteca/indice.csv`, `biblioteca/musica.json` y `config/lectura.json`) pasa a `.gitignore`
   y se quita del repositorio con `git rm --cached`, que lo deja en el disco. El historial anterior
   sigue teniendo las versiones viejas. `lectura.py` ya no falla si `lectura.json` no existe.
+
+## Publicación sin créditos
+
+Decisión del usuario: los créditos ya no se escriben en `publicacion.md`; el autor y la
+licencia de cada archivo se quedan solo en `biblioteca/indice.csv`, en local. Como **CC BY obliga
+a citar al autor allí donde se publica**, a partir de ahora solo se usa material que no lo
+exige: Pixabay, Pexels, dominio público, CC0 y la NASA (pide reconocerla, pero no lo exige).
+- Commons acepta solo dominio público y CC0 (las 34 fotos CC BY de Perpiñán quedan fuera).
+- `creditos.py` pasa a ser `revisar_publicacion.py`: no escribe nada; comprueba que ningún
+  archivo del short exija atribución y mide los textos. 012 da error: usa 9 fotos CC BY.
+
+## Fuente NASA (`scripts/fuentes/nasa.py`)
+
+Sin clave. Busca vídeos y fotos a la vez (`media_type=video,image`) de 12 en 12, porque cada
+resultado necesita dos consultas más: el manifiesto (`/asset`) y `metadata.json` (ancho, alto
+y duración, para ordenar por prioridad sin descargar). Rechaza lo de terceros (©, courtesy,
+SpaceX, ESA...). Problemas: un original de 6,3 GB (se usa `~large`), y rutas con espacios
+(«SLS Roll Out Beauty Shot») que Python no quería pedir: se codifican; una miniatura que falla
+ya no tumba el servidor.
+
+## Skill e ideas
+
+- **Skill**: sección «0. Tema y material» (temas por defecto, actualidad, neutralidad en temas
+  políticos, primero el material auténtico, superlativos verificados) y fórmulas de título.
+- **`shorts/ideas.md`** (local): 15 temas con el material legal comprobado mirando miniaturas.
+  Lección: en Pixabay el filtro solo exige la primera palabra en las etiquetas, y «palm»,
+  «sphere» o «three» devolvían palmeras, bolas de cristal y velas; el recuento no basta.
+- **Marca `[generico]`**: el plan la proponía, pero en 012 bastó con `[plano]` y la etiqueta
+  `generico` del índice (que la saca del relleno automático). Se queda una sola marca.
 
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

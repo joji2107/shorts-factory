@@ -1,9 +1,11 @@
 """Wikimedia Commons (API de MediaWiki, sin clave): fotos y vídeos con licencia libre.
 
-Solo se aceptan dominio público, CC0 y CC BY (cualquier versión, también las adaptadas a un
-país, como cc-by-3.0-de). Se rechazan CC BY-SA (obligaría a publicar el short con la misma
-licencia), NC (no comercial), ND (sin obras derivadas: el recorte y el movimiento lo son) y
-lo que no tenga una licencia clara. La licencia es de cada archivo: se lee de extmetadata.
+Solo se aceptan dominio público y CC0: desde la fase 11 los shorts se publican sin créditos
+(el autor y la licencia se quedan en biblioteca/indice.csv, en local), y CC BY obliga a citar
+al autor allí donde se publica. Se rechazan también CC BY-SA (además obligaría a publicar el
+short con la misma licencia), NC (no comercial), ND (sin obras derivadas: el recorte y el
+movimiento lo son) y lo que no tenga una licencia clara. La licencia es de cada archivo: se
+lee de extmetadata.
 
 Lo que exigen las licencias (Commons:Reusing content outside Wikimedia y Commons:Credit line):
 - CC BY: autor, nombre de la licencia, enlace a la licencia, enlace a la fuente si es posible,
@@ -34,7 +36,7 @@ POR_PAGINA = 50
 ANCHO_FOTO = 3840                     # se descarga la versión escalada a este ancho, no el original
 MINIATURA = 500                       # Wikimedia solo sirve anchos estándar (400 da error 400)
 LADO_MIN = 1000                      # fotos con el lado corto menor se ven borrosas en 1080x1920
-ACEPTADAS = re.compile(r"(pd|cc0|cc-by-\d(\.\d)?(-[a-z]+)?)")
+ACEPTADAS = re.compile(r"(pd|cc0)")
 FOTOS = {"image/jpeg", "image/png", "image/tiff", "image/webp"}
 METADATOS = "License|LicenseShortName|LicenseUrl|Artist|Credit|Restrictions|AttributionRequired"
 
@@ -78,7 +80,9 @@ def motivo_rechazo(licencia):
         return "son CC BY-SA"
     if "-nc" in licencia or "-nd" in licencia:
         return "son NC o ND"
-    return "no tienen una licencia aceptada (dominio público, CC0 o CC BY)"
+    if licencia.startswith("cc-by"):
+        return "piden citar al autor (CC BY) y los shorts van sin créditos"
+    return "no tienen una licencia aceptada (dominio público o CC0)"
 
 
 def nombre_licencia(codigo, corto):
@@ -90,7 +94,7 @@ def nombre_licencia(codigo, corto):
 
 
 def atribucion(titulo, autor, licencia, licencia_url, url):
-    """El texto de crédito que pide la licencia, para el índice y los créditos."""
+    """El texto de crédito de la fuente, para el registro local del índice."""
     if licencia.startswith("CC BY"):
         return (f"«{titulo}», de {autor}, {licencia} ({licencia_url}), vía Wikimedia Commons "
                 f"({url}). Recortada y con movimiento")
@@ -123,7 +127,7 @@ def a_formato_comun(pagina, rechazos):
     if not autor and sin_html((meta.get("Credit") or {}).get("value")).lower() in ("own work", "trabajo propio"):
         autor = info.get("user", "")           # "obra propia" sin autor escrito: es quien la subió
     if not autor:
-        rechazos["no dicen quién es el autor (CC BY obliga a citarlo)"] += 1
+        rechazos["no dicen quién es el autor"] += 1
         return None
     licencia = nombre_licencia(codigo, sin_html((meta.get("LicenseShortName") or {}).get("value")))
     licencia_url = sin_html((meta.get("LicenseUrl") or {}).get("value"))

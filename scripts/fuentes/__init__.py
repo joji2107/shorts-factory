@@ -44,12 +44,12 @@ def con_cache(fuente, parametros, pedir):
     return datos
 
 
-from . import commons, pixabay          # noqa: E402  (usan lo de arriba)
+from . import commons, nasa, pixabay    # noqa: E402  (usan lo de arriba)
 
 # "variable": la variable de .env que se pasa a buscar() como clave (en Commons, el contacto
-# que exige su política de User-Agent). "palabra_clave": exigir la primera palabra de la
-# búsqueda en las etiquetas (Pixabay devuelve vídeos que solo se parecen; en Commons se
-# busca por categoría, que ya es precisa).
+# que exige su política de User-Agent; vacía si la fuente no pide nada, como la NASA).
+# "palabra_clave": exigir la primera palabra de la búsqueda en las etiquetas (Pixabay devuelve
+# vídeos que solo se parecen; en Commons se busca por categoría, que ya es precisa).
 FUENTES = {
     "pixabay": {"buscar": pixabay.buscar, "variable": "PIXABAY_API_KEY", "nombre": "Pixabay",
                 "licencia": "Pixabay Content License",
@@ -58,4 +58,7 @@ FUENTES = {
     "commons": {"buscar": commons.buscar, "variable": "WIKIMEDIA_CONTACTO", "nombre": "Wikimedia Commons",
                 "licencia": "", "licencia_url": "", "web": "https://commons.wikimedia.org",
                 "palabra_clave": False},
+    # La NASA no pide clave (variable vacía); solo sirve para temas de la NASA
+    "nasa": {"buscar": nasa.buscar, "variable": "", "nombre": "NASA", "licencia": nasa.LICENCIA,
+             "licencia_url": nasa.LICENCIA_URL, "web": "https://images.nasa.gov", "palabra_clave": False},
 }

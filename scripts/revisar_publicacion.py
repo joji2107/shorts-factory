@@ -1,19 +1,17 @@
-"""Créditos y medida de los textos de publicación de un short (shorts/<nombre>/publicacion.md).
+"""Revisa los textos de publicación de un short (shorts/<nombre>/publicacion.md) antes de publicar.
 
-1. Mira qué archivos usa el short: los clips de su lista de cortes (cortes.txt de la
-   receta o, si no tiene, cortes_auto.txt de data/shorts/; si aún no existe, los clips de
-   la receta), la música y los efectos que suenan. Busca su autor en biblioteca/indice.csv.
-2. Escribe los créditos en publicacion.md:
-   - una línea "Créditos:" sola se sustituye, junto con las líneas que la siguen hasta
-     la primera vacía, por la versión larga (autor, fuente y url de cada archivo);
-   - una línea que empieza por "Créditos: " (con texto detrás) se sustituye por la
-     versión corta, de una sola línea (para X).
-   Se puede repetir: vuelve a escribir los mismos créditos.
-3. Mide cada bloque ```text con el límite de su plataforma (LIMITES). Un bloque que
-   sirve para varias plataformas va en una sección como "## YouTube, Instagram y TikTok"
-   y se mide con el límite de cada una. Si alguno se pasa, termina con código 1.
+1. Licencias: mira qué archivos usa el short (los clips de su lista de cortes: cortes.txt de
+   la receta o, si no tiene, cortes_auto.txt de data/shorts/; si aún no existe, los clips de
+   la receta; la música y los efectos que suenan) y busca su licencia en biblioteca/indice.csv.
+   Desde la fase 11 los créditos no se escriben en la publicación (la licencia y el autor de
+   cada archivo se quedan solo en el índice, en local), así que el short solo puede usar
+   material que no obliga a citar al autor: Pixabay, Pexels, dominio público, CC0 y la NASA
+   (pide reconocerla, pero no lo exige). Si usa algo CC BY, lo dice y termina con código 1.
+2. Mide cada bloque ```text con el límite de su plataforma (LIMITES). Un bloque que sirve
+   para varias plataformas va en una sección como "## YouTube, Instagram y TikTok" y se mide
+   con el límite de cada una. Si alguno se pasa, termina con código 1.
 
-Uso: python scripts/creditos.py 002-caballo
+Uso: python scripts/revisar_publicacion.py 012-protestas_francia
 """
 import argparse
 import re
@@ -82,77 +80,15 @@ def fichas(archivos, indice):
     return [indice[archivo] for archivo in archivos]
 
 
-def autores_por_fuente(filas):
-    """'A y B (Pixabay); C (Pexels)': cada autor una vez, agrupados por fuente. Si la
-    licencia obliga a citarla (CC BY), va con la fuente: 'D (Wikimedia Commons, CC BY 4.0)'."""
-    fuentes = {}
-    for fila in filas:
-        grupo = fila["fuente"]
-        if fila.get("licencia", "").startswith("CC BY"):
-            grupo += f", {fila['licencia']}"
-        fuentes.setdefault(grupo, [])
-        if fila["autor"] not in fuentes[grupo]:
-            fuentes[grupo].append(fila["autor"])
-
-    def enumerar(nombres):
-        return nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1]
-
-    return "; ".join(f"{enumerar(autores)} ({fuente})" for fuente, autores in fuentes.items())
-
-
-def textos_de_creditos(nombre):
-    """(líneas de la versión larga, línea de la versión corta), o None si aún no hay clips."""
+def exigen_atribucion(nombre):
+    """Las filas del índice de los archivos del short cuya licencia obliga a citar al autor
+    allí donde se publica (CC BY). None si el short aún no tiene clips."""
     clips, musica, efectos = archivos_usados(nombre)
     if not clips:
         return None
     indice = {fila["archivo"]: fila for fila in leer_indice()}
-    clips, musica, efectos = (fichas(grupo, indice) for grupo in (clips, musica, efectos))
-
-    def linea_clip(fila):
-        # Con atribución (Commons, NASA...) va el texto exacto que pide su licencia
-        tipo = "Foto" if fila["tipo"].strip() == "imagen" else "Vídeo"
-        if fila.get("atribucion", "").strip():
-            return f"{tipo}: {fila['atribucion'].strip()}"
-        return f"{tipo}: {fila['autor']} en {fila['fuente']}, {fila['url']}"
-
-    largo = ["Créditos:"]
-    largo += [linea_clip(fila) for fila in clips]
-    largo += [f"Música: {fila['autor']} en {fila['fuente']}, {fila['url']}" for fila in musica]
-    if efectos:
-        largo.append(f"Efectos de sonido: {autores_por_fuente(efectos)}")
-
-    videos = [fila for fila in clips if fila["tipo"].strip() != "imagen"]
-    fotos = [fila for fila in clips if fila["tipo"].strip() == "imagen"]
-    partes = []
-    if videos:
-        partes.append(f"vídeos de {autores_por_fuente(videos)}")
-    if fotos:
-        partes.append(f"fotos de {autores_por_fuente(fotos)}")
-    if musica:
-        partes.append(f"música de {autores_por_fuente(musica)}")
-    if efectos:
-        partes.append(f"efectos de {', '.join(sin_repetir(fila['fuente'] for fila in efectos))}")
-    corto = "Créditos: " + "; ".join(partes) + "."
-    return largo, corto
-
-
-def poner_creditos(lineas, largo, corto):
-    """Sustituye los créditos de publicacion.md. Devuelve (líneas nuevas, cuántos cambió)."""
-    resultado, saltando, cambios = [], False, 0
-    for linea in lineas:
-        if saltando:
-            if linea.strip() and not linea.startswith("```"):
-                continue        # línea de los créditos anteriores
-            saltando = False
-        if linea.rstrip() == "Créditos:":
-            resultado.extend(largo)
-            saltando, cambios = True, cambios + 1
-        elif linea.startswith("Créditos: "):
-            resultado.append(corto)
-            cambios += 1
-        else:
-            resultado.append(linea)
-    return resultado, cambios
+    filas = fichas(clips + musica + efectos, indice)
+    return [fila for fila in filas if fila["licencia"].strip().upper().startswith("CC BY")]
 
 
 def bloques(lineas):
@@ -214,7 +150,7 @@ def informe(lineas):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Créditos y medida de los textos de publicación")
+    parser = argparse.ArgumentParser(description="Licencias y medida de los textos de publicación")
     parser.add_argument("short", help="Carpeta del short, por ejemplo 002-caballo")
     args = parser.parse_args()
 
@@ -223,21 +159,24 @@ def main():
         sys.exit(f"No existe {ruta.relative_to(RAIZ)}")
     lineas = ruta.read_text(encoding="utf-8").splitlines()
 
-    creditos = textos_de_creditos(args.short)
-    if creditos is None:
-        print("Todavía no hay clips elegidos: los créditos se quedan pendientes.")
+    atribucion = exigen_atribucion(args.short)
+    problema = False
+    if atribucion is None:
+        print("Todavía no hay clips elegidos: las licencias se revisan después del render.")
+    elif atribucion:
+        problema = True
+        print(f"ATENCIÓN: {len(atribucion)} archivos exigen citar al autor (CC BY) y la publicación no lleva créditos:")
+        for fila in atribucion:
+            print(f"  {fila['archivo']}: {fila['licencia']}, de {fila['autor']}")
+        print("Cámbialos por material sin esa obligación o añade su crédito a mano en la publicación.")
     else:
-        lineas, cambios = poner_creditos(lineas, *creditos)
-        if cambios:
-            ruta.write_text("\n".join(lineas) + "\n", encoding="utf-8")
-            print(f"Créditos escritos en {cambios} sitios de {ruta.relative_to(RAIZ)}:")
-            print("\n".join("  " + linea for linea in creditos[0]))
-        else:
-            print("No hay ninguna línea 'Créditos:' donde escribirlos.")
+        print("Licencias: todo el material se puede publicar sin créditos.")
 
     print("\nMedidas:")
     if informe(lineas):
         sys.exit("\nAlgún texto se pasa del límite de su plataforma.")
+    if problema:
+        sys.exit("\nHay material que exige créditos.")
 
 
 if __name__ == "__main__":

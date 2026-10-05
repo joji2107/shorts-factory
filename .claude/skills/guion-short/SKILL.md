@@ -1,6 +1,6 @@
 ---
 name: guion-short
-description: Escribe el guion de un short sobre un tema (gancho, dato, giro y remate, con datos verificados y sus fuentes), prepara su ficha en shorts/NNN-tema/ con guion.md y config.json (música, efectos), comprobando el material de vídeo, y sus textos de publicación (publicacion.md: títulos, descripción con fuentes y créditos, hashtags y comentario fijado para YouTube, Instagram, TikTok y X). Úsala cuando el usuario pida un short, un guion o un vídeo nuevo sobre un tema, o los textos para publicar un short.
+description: Escribe el guion de un short sobre un tema (gancho, dato, giro y remate, con datos verificados y sus fuentes), prepara su ficha en shorts/NNN-tema/ con guion.md y config.json (música, efectos), comprobando el material de vídeo, y sus textos de publicación (publicacion.md: títulos, descripción con fuentes, hashtags y comentario fijado para YouTube, Instagram, TikTok y X; sin créditos). Úsala cuando el usuario pida un short, un guion o un vídeo nuevo sobre un tema, o los textos para publicar un short.
 argument-hint: "[tema | NNN-tema]"
 ---
 
@@ -42,12 +42,48 @@ Música de cada short (por orden de número, sin los 9xx de prueba):
 !`ls shorts data/archivo data/bandeja data/revision data/listos 2>/dev/null | grep -oE "^[0-8][0-9]{2}-" | sort | tail -1 || true`
 
 Música del índice (archivo, etiquetas: la primera es el estado de ánimo):
-!`grep ",musica," biblioteca/indice.csv | cut -d, -f1,8 || true`
+!`grep ",musica," biblioteca/indice.csv | cut -d, -f1,10 || true`
 
 Efectos del índice:
-!`grep ",sfx," biblioteca/indice.csv | cut -d, -f1,8 || true`
+!`grep ",sfx," biblioteca/indice.csv | cut -d, -f1,10 || true`
 
 El "short anterior" es el de número más alto por debajo de 900.
+
+## 0. Tema y material (antes de escribir nada)
+
+**Temas por defecto** (fase 11): **megaproyectos, ingeniería imposible, construcciones,
+vehículos y lugares extremos o extraños**, salvo que el usuario pida otra cosa. Las ideas
+están en `shorts/ideas.md`, con el material legal que hay de cada una. Si no dice tema,
+propón 2 o 3 de ahí (o de actualidad que encaje), diciendo de dónde saldría el material.
+
+**Actualidad e impacto**: lo que mejor ha funcionado (010, la lluvia en Barcelona) fue un
+tema del momento con imágenes impactantes. Si hay una noticia de estos días que encaje, mejor,
+pero el material tiene que ser legal: los vídeos de TikTok o de las cadenas no lo son (010
+usó clips de TikTok con licencia «falta»). **Temas políticos o delicados** (012, las
+protestas en Francia): solo información, cada cifra con quién la da, las posturas de cada
+parte con sus palabras y sin valorar quién tiene razón; el valor lo pone un dato curioso
+histórico o actual. Sin caras reconocibles de menores ni imágenes de detenciones.
+
+**Primero el material**: antes de escribir el guion, comprueba que hay material **auténtico
+del objeto concreto** (el viaducto de Millau, no un puente cualquiera) y con una licencia
+que no obligue a citar al autor (los shorts van sin créditos):
+1. Vídeo: `ver_candidatos` en Pixabay (búsqueda en inglés) y, si es de la NASA, con
+   `fuente="nasa"`. Mira las miniaturas: que sea ese objeto, real y no IA.
+2. Si no hay vídeo, fotos: `ver_candidatos(..., fuente="commons")` por categoría
+   (`"Category:Viaduc de Millau"`; solo dominio público y CC0).
+3. Orden: vídeo vertical, vídeo horizontal, foto vertical, foto horizontal.
+4. Los planos genéricos (otro puente, hormigón, una grúa) pueden acompañar en frases
+   generales, con la etiqueta `generico` y `[plano]`, pero **nunca presentarse como si
+   fueran el proyecto del que hablamos**.
+
+Si no hay material auténtico suficiente (al menos 2 o 3 planos buenos del objeto y relleno
+para el resto), dilo y propón otro tema en vez de escribir el guion.
+
+**Superlativos** («el más grande del mundo», «el más largo»): verifícalos especialmente.
+Muchas veces son eslóganes del propio proyecto o de quien lo promueve. Solo valen con una
+fuente independiente (Guinness, un organismo técnico, una revista de ingeniería, prensa que
+cite a expertos); la web del proyecto no cuenta. Si no se confirma, «uno de los…» o la
+medida concreta («el puente con la pila más alta»).
 
 ## 1. Guion
 
@@ -361,8 +397,8 @@ Dile al usuario:
   elegirá los clips con esa duración, anotará en `data/registro.log` si el material
   no alcanza, y al terminar sumará la grabación a la velocidad de lectura.
 - Un resumen: guion.md, música, efectos y estado del material.
-- Que `publicacion.md` ya tiene los textos, pero los créditos se completan después
-  del render (paso 5).
+- Que `publicacion.md` ya tiene los textos (sin créditos) y que, después del render,
+  `revisar_publicacion.py` comprobará las licencias del material usado (paso 5).
 
 ## 5. Publicación
 
@@ -371,7 +407,14 @@ hace justo después de la ficha (o directamente, si el short ya existe). Todo sa
 guion: no añadas datos que no estén en él o en sus fuentes.
 
 **Títulos**: 3 opciones de unos 60 caracteres como máximo (YouTube corta hacia ahí en
-el móvil; el límite es 100). El tema o la palabra clave al principio y una brecha de
+el móvil; el límite es 100). En los temas de la fase 11, al menos una con estas fórmulas
+(adaptada para que sea verdad, con los superlativos verificados):
+- «La [cosa] más [adjetivo] del mundo»
+- «Esta podría ser la [cosa] más loca del mundo»
+- «Así es como [país] [hace algo]»
+- «Parece [X], pero en realidad es [Y]»
+- «Construyeron esta [cosa] para una sola cosa»
+ El tema o la palabra clave al principio y una brecha de
 curiosidad que el vídeo **resuelva de verdad**: nada que prometa algo que el vídeo no
 da, ni exageraciones que el guion no diga. Si la técnica es *reto inicial*, el título
 plantea el reto sin dar la respuesta. Marca tu favorita y di por qué.
@@ -384,12 +427,16 @@ plantea el reto sin dar la respuesta. Marca tu favorita y di por qué.
    siguiente dato*, que pregunte qué animal quieren después; con *reto inicial*, si lo
    habían adivinado...).
 4. `Fuentes:` con el medio y la url de cada fuente del guion.
-5. Los créditos: una línea `Créditos:` sola, seguida de `(pendientes: se rellenan con
-   creditos.py)`. Los escribe el script con los datos del índice; no los copies a mano.
-6. Entre 3 y 5 hashtags en español, sin tildes ni `#shorts`: el del tema primero, uno
+5. Entre 3 y 5 hashtags en español, sin tildes ni `#shorts`: el del tema primero, uno
    o dos generales (`#animales`, `#curiosidades`) y alguno del dato (`#pulpo`,
    `#sangreazul`). YouTube enseña los tres primeros encima del título e Instagram solo
    tiene en cuenta 5.
+
+**Sin créditos** (decisión del usuario, fase 11): la publicación no lleva créditos; el
+autor y la licencia de cada archivo se quedan solo en `biblioteca/indice.csv`, en local.
+Por eso **solo se usa material que no obliga a citar al autor**: Pixabay, Pexels, dominio
+público, CC0 y la NASA (pide reconocerla como fuente, pero no lo exige). Commons ya rechaza
+CC BY por eso. Si algo de un short exige atribución, `revisar_publicacion.py` lo dice.
 
 **Comentario fijado**: una pregunta que invite a contestar, fácil de responder y
 distinta de la de la descripción. 150 caracteres como máximo (el límite de TikTok),
@@ -403,7 +450,7 @@ cuando una plataforma lo necesite:
 | YouTube | título 100 · descripción 5000 · comentario 10 000 |
 | Instagram | descripción 2200 (se ven unos 125) · como máximo 5 hashtags |
 | TikTok | descripción 4000 (se ven unos 80) · comentario 150 |
-| X | 280 por post (cada url cuenta 23): no caben fuentes ni créditos, que van en una respuesta al propio post |
+| X | 280 por post (cada url cuenta 23): no caben las fuentes, que van en una respuesta al propio post |
 
 Plantilla (los nombres de las secciones `##` y `###` son los que mide el script):
 
@@ -437,9 +484,6 @@ Plantilla (los nombres de las secciones `##` y `###` son los que mide el script)
 Fuentes:
 - <medio>: <url>
 
-Créditos:
-(pendientes: se rellenan con creditos.py)
-
 #tema #general #dato
 ```
 ### Comentario fijado
@@ -455,18 +499,17 @@ Créditos:
 ### Respuesta
 ```text
 Fuentes: <url> <url>
-Créditos: (pendientes)
 ```
 ````
 
-**Medir y completar**: los caracteres no se cuentan a ojo. Después de escribir el
-archivo, y otra vez cuando el short tenga clips (tras el render), ejecuta:
+**Revisar**: los caracteres no se cuentan a ojo. Después de escribir el archivo, y otra
+vez cuando el short tenga clips (tras el render), ejecuta:
 
 ```bash
-docker run --rm -t -v "$PWD:/proyecto" shorts-whisper python /proyecto/scripts/creditos.py NNN-tema
+docker run --rm -t -v "$PWD:/proyecto" shorts-whisper python /proyecto/scripts/revisar_publicacion.py NNN-tema
 ```
 
-Rellena los créditos con los clips que el short usa de verdad (de su lista de cortes),
-la música y los efectos, y mide cada texto con el límite de cada plataforma. Si algo
-"SE PASA", acórtalo y vuelve a ejecutarlo. Enseña al usuario los títulos con tu
-favorita y las medidas.
+Mide cada texto con el límite de cada plataforma y comprueba que ningún archivo que usa el
+short (de su lista de cortes, más la música y los efectos) exija citar al autor. Si algo
+"SE PASA", acórtalo y vuelve a ejecutarlo; si hay material CC BY, cámbialo. Enseña al
+usuario los títulos con tu favorita y las medidas.
