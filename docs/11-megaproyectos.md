@@ -243,5 +243,19 @@ casi nada de eso, así que se añadió:
 
 **Comprobación**: 004-elefante, misma lista de cortes con semilla y mismo fondo (md5).
 
+## Short 016-internet_muerto: texto de portada y música sincronizada a una palabra
+
+- **Rigor en un tema delicado**: la teoría (foro anónimo, 2021: internet «murió» en 2016 y alguien
+  lo controla) se separa de los datos. Todas las cifras de tráfico salen de empresas que venden
+  protección contra bots (Imperva, Cloudflare) y dependen de qué se mide: en 2025, el 53 % de las
+  peticiones de páginas fueron de bots, pero solo el 30 % de todas las peticiones. Ya en 2016
+  Imperva daba un 52 %. Por eso el guion dice «visitas a páginas web» y aclara que son programas,
+  no gente falsa hablando contigo.
+- **Texto de portada**: la promesa en grande desde el primer fotograma, para quien ve el vídeo sin
+  sonido (`subtitulos.portada`), en los subtítulos `.ass` con su propio estilo.
+- **Música sincronizada**: `techno_02` es «plana» para el análisis (sin subida fuerte), pero rompe
+  en su segundo 21,8. Con `musica.sincronizar`, ese segundo cae al empezar «foro», justo cuando
+  empieza la teoría, lea como lea el locutor.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

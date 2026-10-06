@@ -77,6 +77,26 @@ def anclar_a_palabras(efectos, json_palabras):
     return resultado
 
 
+def sincronizar_musica(config, json_palabras):
+    """musica.sincronizar {"segundo", "palabra", "vez"} (016): la canción empieza donde haga
+    falta para que ese segundo suyo (en techno_02, donde rompe) suene justo al empezar esa
+    palabra. Cambia musica.inicio en la configuración; si la palabra no está, avisa y no toca nada."""
+    s = config["musica"].get("sincronizar")
+    if not s or not config["musica"]["archivo"]:
+        return
+    palabras = json.loads(json_palabras.read_text(encoding="utf-8"))
+    limpia = lambda texto: texto.lower().strip("¿?¡!.,;:…\"'«»()")
+    inicios = [p["inicio"] for p in palabras if limpia(p["palabra"]) == limpia(s["palabra"])]
+    vez = s.get("vez", 1)
+    if len(inicios) < vez:
+        print(f"   AVISO: musica.sincronizar: la palabra '{s['palabra']}' (vez {vez}) no está en la "
+              "transcripción: la música empieza en musica.inicio")
+        return
+    config["musica"]["inicio"] = round(max(0.0, s["segundo"] - inicios[vez - 1]), 3)
+    print(f"   música desde el segundo {config['musica']['inicio']:g}: su segundo {s['segundo']:g} "
+          f"al empezar «{s['palabra']}» ({inicios[vez - 1]:.2f} s)")
+
+
 def situar_flechas(guion, palabras, edl, biblioteca, config):
     """Las flechas del guion ([flecha x y]) en el vídeo: (inicio, fin, x, y) en la pantalla, y
     sus sonidos (efectos con "momento", que es el centro del efecto). Cada flecha aparece al
@@ -220,6 +240,7 @@ def crear(nombre, rehacer=None, despues_de_voz=None, al_paso=None):
             generar_fondo(edl, biblioteca, trabajo / "cortes", archivos["fondo"], config["video"],
                           marcas_de_agua(RAIZ))
         elif paso == "render":
+            sincronizar_musica(config, palabras_final)
             # Efectos escritos a mano en la configuración, o elegidos automáticamente
             efectos = anclar_a_palabras(config["efectos"]["lista"], palabras_final)
             if not efectos and config["efectos"]["automaticos"] > 0:

@@ -245,10 +245,36 @@ def cabecera(c):
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Short,{c['fuente']},{c['tamano']},&H00{texto},&H00{texto},&H00{contorno},"
-        f"&H00000000,-1,0,0,0,100,100,0,0,1,{c['contorno']},0,2,60,60,{c['margen_vertical']},1\n\n"
+        f"&H00000000,-1,0,0,0,100,100,0,0,1,{c['contorno']},0,2,60,60,{c['margen_vertical']},1\n"
+        + estilo_portada(c) + "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
+
+
+def estilo_portada(c):
+    """Estilo del texto de portada (subtitulos.portada), arriba y más grande; "" sin portada,
+    así el .ass de siempre no cambia."""
+    portada = c.get("portada")
+    if not portada or not portada.get("texto"):
+        return ""
+    texto, contorno = color_ass(c["color_texto"]), color_ass(c["color_contorno"])
+    return (f"Style: Portada,{c['fuente']},{portada['tamano']},&H00{texto},&H00{texto},&H00{contorno},"
+            f"&H00000000,-1,0,0,0,100,100,0,0,1,{portada['contorno']},0,8,70,70,{portada['margen']},1\n")
+
+
+def linea_portada(c):
+    """El texto de portada (016: la promesa en grande desde el primer fotograma, para quien ve
+    el vídeo sin sonido): de 0 a portada.segundos, con un fundido de salida. "|" parte la línea
+    y lo que va entre ** sale en el color de resaltado."""
+    portada = c.get("portada")
+    if not portada or not portada.get("texto"):
+        return ""
+    texto = portada["texto"].upper() if c["mayusculas"] else portada["texto"]
+    texto = texto.replace("{", "(").replace("}", ")").replace("|", "\\N")
+    texto = re.sub(r"\*\*(.+?)\*\*", lambda m: f"{{\\1c&H{color_ass(c['color_resaltado'])}&}}{m.group(1)}{{\\r}}", texto)
+    return (f"Dialogue: 1,{formato_ass(0)},{formato_ass(portada['segundos'])},Portada,,0,0,0,,"
+            f"{{\\fad(0,{round(portada['fundido'] * 1000)})}}{texto}\n")
 
 
 def agrupar(palabras, c):
@@ -290,7 +316,7 @@ def generar_ass(json_entrada, ass_salida, c, guion=None):
         print(f"   {len(resaltados)} de {en_negrita} palabras en negrita del guion resaltadas")
     grupos = agrupar(palabras, c)
 
-    lineas = [cabecera(c)]
+    lineas = [cabecera(c), linea_portada(c)]
     for n, g in enumerate(grupos):
         inicio, fin = g[0]["inicio"], g[-1]["fin"]
         if n + 1 < len(grupos) and grupos[n + 1][0]["inicio"] - fin < 0.25:

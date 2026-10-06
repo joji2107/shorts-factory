@@ -169,6 +169,11 @@ leen y la hoja para leer las trata sola):
 - `[plano negro 0 N]`: pantalla en negro. `video.imagen.acercar: {foto: [x, y]}`: zoom lento
   hacia ese punto de la foto. Un efecto con `"al_empezar": true` suena al empezar su palabra.
 - Carrusel rápido: planos de 2-3 s cada 2-3 palabras; se recortan solos (hasta 0,5 s).
+- Texto de portada (016): `"subtitulos": {"portada": {"texto": "¿Internet está|**muerto**?", "segundos": 4}}`
+  pone la promesa en grande arriba desde el primer fotograma, para quien ve el vídeo sin sonido.
+- Música sincronizada (016): `"musica": {"sincronizar": {"segundo": 21.8, "palabra": "foro"}}`
+  hace que ese segundo de la canción (donde rompe, mirado en su curva) caiga al empezar esa
+  palabra (que salga una sola vez en el guion). Sirve con canciones planas que tienen un drop.
 
 **Protagonistas**: después de tener el material (paso 3), genera las hojas de fotogramas
 del tema y míralas con Read:

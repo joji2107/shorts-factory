@@ -23,7 +23,8 @@
     "resaltar_negritas": true,
     "corregir_con_guion": true,
     "color_resaltado": "#FFC93C",
-    "duracion_min": 0.7
+    "duracion_min": 0.7,
+    "portada": {"texto": null, "segundos": 3.5, "tamano": 112, "contorno": 9, "margen": 300, "fundido": 0.4}
   },
   "video": {
     "segundos_corte": 3,
