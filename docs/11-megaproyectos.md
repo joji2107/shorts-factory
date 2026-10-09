@@ -257,5 +257,21 @@ casi nada de eso, así que se añadió:
   en su segundo 21,8. Con `musica.sincronizar`, ese segundo cae al empezar «foro», justo cuando
   empieza la teoría, lea como lea el locutor.
 
+## Short 017-elecciones: clip propio .mov, fotos .webp y un logo pegado al borde
+
+- **Imparcialidad**: el motivo de las elecciones va como hechos (qué decretos se rechazaron y
+  quién votó en contra) y la postura del Gobierno con sus palabras. Se descartaron dos datos en
+  los que los medios no coincidían («el octavo adelanto desde 1978»: unos cuentan siete, otros
+  ocho o nueve; «casi ocho meses antes»: unos dicen siete). El dato curioso no culpa a nadie:
+  Juan Carlos I vivió 11 elecciones generales en casi 39 años; Felipe VI, 6 en 12.
+- **Formatos**: el usuario trajo una grabación de pantalla `.mov` y fotos `.webp`. Convertirlas
+  habría sido escribir copias en la biblioteca; ahora `ruta_clip()` acepta esos formatos.
+- **Logo sin tapar**: en el clip de Sánchez (320x748), la caja del logo medía 35 px y estaba
+  pegada al borde derecho. Los 12 px de difuminado del parche lo dejaban transparente justo ahí.
+  Ahora el difuminado es de un cuarto de la caja como mucho y no se aplica hacia el borde de la
+  imagen. Se vio ampliando el fotograma de la prueba antes de grabar.
+- **Licencias**: las fotos y el clip son del usuario o descargados por él, con licencia «falta»;
+  esta vez decidió no tenerlo en cuenta. `revisar_publicacion.py` lo avisa.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

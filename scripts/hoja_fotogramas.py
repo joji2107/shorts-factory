@@ -12,7 +12,7 @@ import math
 
 import material
 from crear_short import RAIZ, config_base
-from pasos.clips import es_foto, filtro_foto, ruta_clip
+from pasos.clips import es_foto, existe_clip, filtro_foto, ruta_clip
 from pasos.utilidades import duracion, ejecutar
 
 SALIDA = RAIZ / "data" / "cache" / "fotogramas"
@@ -58,7 +58,7 @@ def main():
 
     clips = []
     for nombre in args.clips:
-        es_clip = (material.VIDEOS / f"{nombre}.mp4").is_file() or (material.IMAGENES / f"{nombre}.jpg").is_file()
+        es_clip = existe_clip(material.VIDEOS, nombre)
         clips += [nombre] if es_clip else material.clips_del_tema(nombre)
     if not clips:
         raise SystemExit(f"Ni clips ni temas con esos nombres: {', '.join(args.clips)}")

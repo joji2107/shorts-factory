@@ -23,6 +23,7 @@ from pathlib import Path
 import lectura
 import material
 import progreso
+from pasos.clips import es_foto, existe_clip, ruta_clip
 from pasos.marcas import planos_del_guion
 from crear_short import RAIZ, config_base, crear, fusionar
 
@@ -149,7 +150,8 @@ def material_despues_de_voz(nombre):
                       f"clips o se repetirían planos). Usa evaluar_material para ver cuántos faltan")
         # Las fotos son un recurso más, pero un short solo de fotos queda pobre (en 012 no había
         # ni un vídeo): se avisa para añadir vídeo real de contexto con [plano] en frases generales
-        if all((material.IMAGENES / f"{clip}.jpg").is_file() for clip in list(clips) + protagonistas):
+        if all(es_foto(ruta_clip(material.VIDEOS, clip)) for clip in list(clips) + protagonistas
+               if existe_clip(material.VIDEOS, clip)):
             registrar("       AVISO: todo el short son fotos, sin ningún vídeo. Añade vídeo real de "
                       "contexto (el lugar, la situación general) con [plano] en frases generales")
 

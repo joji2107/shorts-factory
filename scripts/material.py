@@ -20,7 +20,7 @@ from collections import Counter
 from pathlib import Path
 
 from crear_short import RAIZ, config_base, fusionar
-from pasos.clips import duracion_clip, es_foto, medidas, ruta_clip
+from pasos.clips import duracion_clip, es_foto, existe_clip, medidas, ruta_clip
 from pasos.cortes import repartir
 
 INDICE = RAIZ / "biblioteca" / "indice.csv"
@@ -112,8 +112,7 @@ def duraciones(clips, segundos_imagen=None):
     """La duración de cada clip (de una foto, la de su vídeo virtual: video.imagen.segundos).
     Se comprueba antes que exista: si ffprobe fallara, ejecutar() imprimiría su error y eso
     rompería el servidor MCP."""
-    faltan = [clip for clip in clips if not ((VIDEOS / f"{clip}.mp4").is_file()
-                                             or (IMAGENES / f"{clip}.jpg").is_file())]
+    faltan = [clip for clip in clips if not existe_clip(VIDEOS, clip)]
     if faltan:
         raise RuntimeError(f"Están en el índice pero no en data/biblioteca/video ni imagen: {', '.join(faltan)}")
     if segundos_imagen is None:

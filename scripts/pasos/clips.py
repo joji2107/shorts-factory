@@ -30,6 +30,10 @@ ZOOM = 0.12              # el zoom pasa de 1,00 a 1 + ZOOM a lo largo del vídeo
 PANEO_MAX = 1.0          # recorrido máximo del desplazamiento, en anchos de pantalla
 FORMA_PANEO = 3 / 4      # fotos más anchas que esto se desplazan; las demás, zoom
 NEGRO = "negro"          # clip especial: pantalla en negro ([plano negro 0 2]), sin archivo
+# Formatos que se aceptan tal cual (017: una grabación de pantalla .mov y fotos .webp): así no
+# hace falta convertirlos, que sería escribir copias nuevas en la biblioteca
+EXT_VIDEO = (".mp4", ".mov")
+EXT_FOTO = (".jpg", ".jpeg", ".png", ".webp")
 
 
 def ruta_clip(biblioteca, clip):
@@ -38,17 +42,25 @@ def ruta_clip(biblioteca, clip):
     tiene archivo: devuelve una ruta que no existe y generar_fondo lo dibuja."""
     if clip == NEGRO:
         return biblioteca / NEGRO
-    video = biblioteca / f"{clip}.mp4"
-    if video.is_file():
-        return video
-    foto = biblioteca.parent / "imagen" / f"{clip}.jpg"
-    if foto.is_file():
-        return foto
+    for extension in EXT_VIDEO:
+        if (biblioteca / f"{clip}{extension}").is_file():
+            return biblioteca / f"{clip}{extension}"
+    for extension in EXT_FOTO:
+        if (biblioteca.parent / "imagen" / f"{clip}{extension}").is_file():
+            return biblioteca.parent / "imagen" / f"{clip}{extension}"
     raise RuntimeError(f"El clip {clip} no está en data/biblioteca/video ni en data/biblioteca/imagen")
 
 
 def es_foto(ruta):
-    return ruta.suffix.lower() == ".jpg"
+    return ruta.suffix.lower() in EXT_FOTO
+
+
+def existe_clip(biblioteca, clip):
+    """True si el clip tiene archivo (vídeo o foto, en cualquiera de los formatos aceptados)."""
+    try:
+        return clip == NEGRO or ruta_clip(biblioteca, clip).is_file()
+    except RuntimeError:
+        return False
 
 
 def duracion_clip(biblioteca, clip, segundos_imagen):
@@ -142,8 +154,15 @@ def filtro_marcas(cajas, inicio, largo):
         if hasta <= 0 or desde >= largo:
             continue
         x, y, ancho, alto = marca["caja"]
-        # Alfa que sube de 0 a 255 en los 12 px de cada borde (comillas: la expresión lleva comas)
-        alfa = "255*min(1,min(min(X,W-1-X),min(Y,H-1-Y))/12)"
+        # Alfa que sube de 0 a 255 en los bordes de la caja, como mucho 12 px o un cuarto de su
+        # lado (comillas: la expresión lleva comas). Hacia el borde de la imagen no se difumina:
+        # en 017 el logo estaba pegado al borde de un vídeo de 320 px y el parche, de 35 px, era
+        # transparente justo ahí
+        lejos = "100000"
+        distancias = [lejos if x <= 0.001 else "X", lejos if x + ancho >= 0.999 else "W-1-X",
+                      lejos if y <= 0.001 else "Y", lejos if y + alto >= 0.999 else "H-1-Y"]
+        alfa = (f"255*min(1,min(min({distancias[0]},{distancias[1]}),min({distancias[2]},{distancias[3]}))"
+                "/max(1,min(12,min(W,H)/4)))")
         partes.append(
             f"[v{n}]split[base{n}][m{n}];"
             f"[m{n}]crop=iw*{ancho}:ih*{alto}:iw*{x}:ih*{y},gblur=sigma=16,format=yuva420p,"

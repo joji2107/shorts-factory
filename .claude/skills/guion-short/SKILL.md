@@ -166,6 +166,8 @@ leen y la hoja para leer las trata sola):
   `sonidos.sonoridad` (-14; más alto en la receta si se pide) y apaga la música mientras suena.
   Puede ir al principio (antes de la primera palabra) o al final (detrás de la última). Busca
   el tramo más fuerte del clip midiendo su sonoridad por segundo (`ebur128`).
+- **Fotos horizontales de personas** (017): el desplazamiento lateral les corta la cara; ponles
+  `video.imagen.acercar` hacia la cara (y `por_foto` 0,5-0,6 para un zoom suave).
 - `[plano negro 0 N]`: pantalla en negro. `video.imagen.acercar: {foto: [x, y]}`: zoom lento
   hacia ese punto de la foto. Un efecto con `"al_empezar": true` suena al empezar su palabra.
 - Carrusel rápido: planos de 2-3 s cada 2-3 palabras; se recortan solos (hasta 0,5 s).
