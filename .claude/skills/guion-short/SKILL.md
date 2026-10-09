@@ -168,6 +168,19 @@ leen y la hoja para leer las trata sola):
   el tramo más fuerte del clip midiendo su sonoridad por segundo (`ebur128`).
 - **Fotos horizontales de personas** (017): el desplazamiento lateral les corta la cara; ponles
   `video.imagen.acercar` hacia la cara (y `por_foto` 0,5-0,6 para un zoom suave).
+- **Animaciones por código** (019, solo si el usuario las pide o un dato se entiende mucho mejor
+  con un mapa): son un clip protagonista más. Escribe la ficha
+  `shorts/NNN-tema/animaciones/<tema>_mapa.json` (`tipo`; para un huracán, `trayectoria_huracan`
+  con `tormenta` del NHC, p. ej. `al092026`, `aviso` `"ultimo"`, `segundos` 8, `titulo` y
+  `lugares` `[nombre, lat, lon, lado]` que no se pisen), genérala en Docker con
+  `docker run --rm -t -v "$PWD:/proyecto" shorts-mapas python /proyecto/scripts/animar.py NNN-tema <nombre>`,
+  mira su hoja de fotogramas y ánclala con `[plano <nombre> 0 8]` en la frase que explica.
+  Con datos que cambian (un aviso nuevo del NHC cada 6 h), vuelve a generarla justo antes del
+  render; en pantalla sale de qué aviso y hora es. Sus fuentes van también en `Fuentes:` de la
+  publicación. Para un puente, túnel o enlace, `perfil_enlace` (020): `tramos` con `tipo`
+  (`puente`, `isla`, `tunel`), `km` y `nombre` (en dos líneas si es largo), `extremos`,
+  `torres_km`/`torres_m`/`galibo_m` verificados y `avion` si viene a cuento; el coche se hunde
+  en el túnel hacia el 55 % de la animación, así que ánclala detrás del respiro de la revelación.
 - `[plano negro 0 N]`: pantalla en negro. `video.imagen.acercar: {foto: [x, y]}`: zoom lento
   hacia ese punto de la foto. Un efecto con `"al_empezar": true` suena al empezar su palabra.
 - Carrusel rápido: planos de 2-3 s cada 2-3 palabras; se recortan solos (hasta 0,5 s).

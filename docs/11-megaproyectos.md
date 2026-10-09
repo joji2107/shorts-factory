@@ -273,5 +273,50 @@ casi nada de eso, así que se añadió:
 - **Licencias**: las fotos y el clip son del usuario o descargados por él, con licencia «falta»;
   esta vez decidió no tenerlo en cuenta. `revisar_publicacion.py` lo avisa.
 
+## Short 019-huracan_isaias: animaciones generadas por código
+
+- **Qué**: un mapa animado de la trayectoria del huracán Isaias, usado en el guion como un clip
+  protagonista más (`[plano huracan_isaias_mapa 0 8]`). Es el primer tipo de un sistema para
+  pedir animaciones en otros shorts: una ficha JSON por animación en el short, un módulo por tipo
+  en `scripts/animaciones/` y el lanzador `scripts/animar.py`.
+- **Datos oficiales**: los shapefiles del Centro Nacional de Huracanes (NHC/NOAA, dominio
+  público): la trayectoria real (`best_track`) y la previsión de cada aviso con su cono
+  (`forecast/archive/al092026_5day_011.zip`). Verificado con los avisos 1 (formación el 6 de
+  octubre en 22,1 N 95,6 O) y 11 (9 de octubre, 04:00 CDT = 11:00 en España, 26,4 N 88,0 O,
+  categoría 2). Las tablas de puntos traen la latitud y la longitud redondeadas a grados enteros:
+  hay que usar la geometría del shapefile.
+- **Mapa**: Natural Earth 50m (dominio público). Proyección Mercator hecha a mano: para un mapa
+  regional no hace falta cartopy, que arrastra GEOS y PROJ.
+- **Imagen aparte** (`Dockerfile.mapas`, matplotlib + pyshp): el vigilante y `shorts-whisper` no
+  cambian. Con 8 GB de RAM, el truco es el *blitting*: el mapa base se dibuja una vez y en cada
+  fotograma solo se pintan las piezas que se mueven; los fotogramas van a FFmpeg por una
+  tubería, sin PNG en disco. Tarda unos 5 s.
+- **Dónde vive**: en `data/animaciones/`, no en `data/biblioteca/` (ahí solo entra lo que trae
+  `buscar_clips`). En el índice, tipo `animacion`: como no es `video` ni `imagen`, no entra en el
+  relleno. `ruta_clip()` la busca después de vídeos y fotos; comprobado que ninguno de los 196
+  clips del índice cambia de ruta.
+- **Problemas**: las etiquetas se pisaban (Houston con Nueva Orleans, Atlanta con «PREVISIÓN») y
+  «categoría 2 · 175 km/h» se salía por la derecha; el recuadro de «PREVISIÓN» salía antes que su
+  texto. Y un corte de 8 s de una animación de 8 s daba 239 fotogramas: el filtro `fps=30` del
+  montaje pierde el último de un vídeo cortado hasta su final. Solución: 0,5 s de colchón quieto.
+- **Créditos**: los shorts siguen sin créditos; las fuentes quedan en el índice, en pantalla
+  («Fuente: NHC/NOAA · Mapa: Natural Earth») y en las fuentes de la publicación.
+
+## Short 020-puente_oresund: un perfil animado como revelación
+
+- **Material**: del puente real solo hay fotos con licencia sin atribución (8, de Commons, en
+  dominio público y CC0; la búsqueda por categoría no daba nada y sí la de texto). Ningún vídeo:
+  en Commons son CC BY o BY-SA y Pixabay no tiene ninguno con la etiqueta. Para que el short no
+  sea solo de fotos: un vídeo genérico (un avión despegando, solo en «estorbarían a los aviones»)
+  y una animación como plano de la revelación.
+- **Animación `perfil_enlace`**: el enlace de lado, con las distancias a escala (puente, isla y
+  túnel, y las torres donde están: 3.739 m de acceso y 490 m de vano) y las alturas exageradas.
+  El coche se hunde bajo el agua porque el agua se dibuja encima de él, semitransparente.
+- **Problemas**: la primera versión salía pequeña y con las etiquetas pisadas; se agrandó la
+  escala vertical sin bajar el túnel a la zona de los subtítulos y las etiquetas largas pasaron a
+  dos líneas. El avión cruzaba por delante de las torres, como si chocara: ahora baja por el lado
+  del aeropuerto. `animar.py` escribía en el índice la fuente del huracán para cualquier
+  animación: ahora cada módulo devuelve la suya.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

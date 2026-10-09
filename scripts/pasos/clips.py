@@ -36,10 +36,17 @@ EXT_VIDEO = (".mp4", ".mov")
 EXT_FOTO = (".jpg", ".jpeg", ".png", ".webp")
 
 
+def animaciones(biblioteca):
+    """data/animaciones: las animaciones generadas por código (scripts/animar.py, imagen
+    shorts-mapas). No están en data/biblioteca porque ahí solo entra lo de buscar_clips."""
+    return biblioteca.parent.parent / "animaciones"
+
+
 def ruta_clip(biblioteca, clip):
-    """El archivo de un clip: el vídeo si está, si no la foto. biblioteca es
-    data/biblioteca/video; las fotos están en data/biblioteca/imagen. El clip "negro" no
-    tiene archivo: devuelve una ruta que no existe y generar_fondo lo dibuja."""
+    """El archivo de un clip: el vídeo si está, si no la foto, y si no la animación. biblioteca
+    es data/biblioteca/video; las fotos están en data/biblioteca/imagen y las animaciones en
+    data/animaciones (son vídeos de 1080x1920: el montaje las corta como cualquier vídeo). El
+    clip "negro" no tiene archivo: devuelve una ruta que no existe y generar_fondo lo dibuja."""
     if clip == NEGRO:
         return biblioteca / NEGRO
     for extension in EXT_VIDEO:
@@ -48,7 +55,11 @@ def ruta_clip(biblioteca, clip):
     for extension in EXT_FOTO:
         if (biblioteca.parent / "imagen" / f"{clip}{extension}").is_file():
             return biblioteca.parent / "imagen" / f"{clip}{extension}"
-    raise RuntimeError(f"El clip {clip} no está en data/biblioteca/video ni en data/biblioteca/imagen")
+    if (animaciones(biblioteca) / f"{clip}.mp4").is_file():
+        return animaciones(biblioteca) / f"{clip}.mp4"
+    raise RuntimeError(f"El clip {clip} no está en data/biblioteca/video, data/biblioteca/imagen ni "
+                       f"data/animaciones (si es una animación, genérala con scripts/animar.py "
+                       f"<short> {clip} en la imagen shorts-mapas)")
 
 
 def es_foto(ruta):

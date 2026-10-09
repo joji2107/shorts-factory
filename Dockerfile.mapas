@@ -1,0 +1,18 @@
+# Animaciones generadas por código (fase 11): mapas con matplotlib y shapefiles con pyshp.
+# Imagen aparte para que shorts-whisper (y el vigilante) sigan con lo justo.
+FROM shorts-ffmpeg
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir matplotlib pyshp
+
+ENV PATH="/opt/venv/bin:$PATH"
+# matplotlib guarda su caché de fuentes aquí (si no, avisa de que no puede escribir en $HOME)
+ENV MPLCONFIGDIR=/tmp/matplotlib
+ENV TZ=Europe/Madrid
+
+WORKDIR /data
+CMD ["bash"]
