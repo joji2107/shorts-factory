@@ -6,4 +6,5 @@ TIPOS = {
     "trayectoria_huracan": "animaciones.trayectoria_huracan",
     "perfil_enlace": "animaciones.perfil_enlace",
     "recorrido_pasos": "animaciones.recorrido_pasos",
+    "comparacion_escala": "animaciones.comparacion_escala",
 }

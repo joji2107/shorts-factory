@@ -335,5 +335,23 @@ casi nada de eso, así que se añadió:
   usa en un vídeo sobre España; el relleno son vídeos de España de la biblioteca y una mano
   escribiendo, puestos a mano en la receta.
 
+## Plantilla de comparación de escala (`comparacion_escala`)
+
+- **Para qué**: un tipo de animación general que cualquier short puede usar dándole solo los
+  objetos: alturas y profundidades en vertical (desde la misma línea, hacia arriba y hacia abajo)
+  y longitudes en horizontal.
+- **Referencias verificadas** en `config/referencias_escala.json` (sí va a Git, es del sistema):
+  12 objetos, cada uno con dos fuentes y la fecha. Ojo con los que cambian: la Torre Eiffel mide
+  330 m desde la antena de 2022 (antes, 324) y la Sagrada Familia, 172,5 m desde febrero de 2026.
+  La fosa de las Marianas no tiene una cifra exacta (10.925-10.935 m según la medición), así que
+  sale «casi 11.000 m».
+- **Comprobación**: se midieron en píxeles las proporciones de las pruebas (Burj Khalifa / Torre
+  Eiffel: 2,55 en pantalla, 2,51 en la realidad; fosa / Everest: 1,24 y 1,24).
+- **Problemas**: cifras largas que se salían de su columna («más de 1.000 m»), un texto final
+  que no cabía en el cartel y etiquetas de cuatro líneas que tocaban la cabecera; se arreglaron
+  partiendo la cifra, ajustando la letra del cartel a su largo y reservando más sitio arriba.
+- `mapa.grabar()` junta la tubería a FFmpeg que los otros tipos llevan copiada; solo la usa el
+  tipo nuevo, para no cambiar los vídeos de 019, 020 y 021.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]

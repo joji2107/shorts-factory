@@ -1,0 +1,74 @@
+{
+  "_info": "Objetos de referencia para la animación comparacion_escala. Cada medida, en metros, comprobada con dos fuentes independientes en la fecha indicada. dimension: altura, profundidad o longitud. texto (opcional) manda sobre la cifra en pantalla.",
+  "persona": {
+    "nombre": "Persona", "medida_m": 1.75, "dimension": "altura", "forma": "persona",
+    "nota": "Una persona de 1,75 m, como escala; no es una media", "fuentes": [], "comprobado": "2026-10-10"
+  },
+  "torre_eiffel": {
+    "nombre": "Torre Eiffel", "medida_m": 330, "dimension": "altura", "forma": "eiffel",
+    "nota": "330 m desde la antena de 2022 (antes, 324)",
+    "fuentes": ["https://shop.toureiffel.paris/en/26-330-meters", "https://rtvc.es/la-torre-eiffel-gana-seis-metros-de-altura-gracias-a-una-nueva-antena/"],
+    "comprobado": "2026-10-10"
+  },
+  "sagrada_familia": {
+    "nombre": "Sagrada Familia", "medida_m": 172.5, "dimension": "altura", "forma": "torre",
+    "nota": "Torre de Jesucristo terminada el 20 de febrero de 2026",
+    "fuentes": ["https://theobjective.com/cultura/2026-02-20/sagrada-familia-torre-jesucristo-iglesia-mundo/", "https://forbes.es/forbestravel/877912/la-sagrada-familia-se-convierte-en-la-iglesia-mas-alta-del-mundo-con-la-coronacion-de-la-torre-de-jesus/"],
+    "comprobado": "2026-10-10"
+  },
+  "estatua_libertad": {
+    "nombre": "Estatua de la Libertad", "medida_m": 93, "dimension": "altura", "forma": "estatua",
+    "nota": "Del suelo a la antorcha, con el pedestal (la estatua sola, 46 m)",
+    "fuentes": ["https://en.wikipedia.org/wiki/Statue_of_Liberty", "https://www.britannica.com/print/article/339344"],
+    "comprobado": "2026-10-10"
+  },
+  "piramide_guiza": {
+    "nombre": "Gran Pirámide de Guiza", "medida_m": 138.5, "dimension": "altura", "forma": "piramide",
+    "nota": "Altura actual; la original era de 146,6 m",
+    "fuentes": ["https://en.wikipedia.org/wiki/Great_Pyramid_of_Giza", "https://kulturenvanteri.com/en/yer/keops-piramidi/"],
+    "comprobado": "2026-10-10"
+  },
+  "burj_khalifa": {
+    "nombre": "Burj Khalifa", "medida_m": 828, "dimension": "altura", "forma": "rascacielos",
+    "nota": "Altura oficial ratificada por el CTBUH",
+    "fuentes": ["https://www.skyscrapercenter.com/building/burj-khalifa/3", "https://www.khl.com/news/ctbuh-ratifies-height-of-burj-khalifa/55351.article"],
+    "comprobado": "2026-10-10"
+  },
+  "everest": {
+    "nombre": "Everest", "medida_m": 8848.86, "dimension": "altura", "forma": "montana",
+    "nota": "Medición conjunta de China y Nepal anunciada el 8 de diciembre de 2020",
+    "fuentes": ["https://amp.cnn.com/cnn/travel/article/mount-everest-height-intl-hnk-scli", "https://www.australiangeographic.com.au/news/2020/12/turns-out-everest-is-higher-than-we-thought/"],
+    "comprobado": "2026-10-10"
+  },
+  "fosa_marianas": {
+    "nombre": "Fosa de las Marianas", "medida_m": 10930, "dimension": "profundidad", "forma": "fosa",
+    "texto": "casi 11.000 m",
+    "nota": "Las mediciones recientes dan entre 10.925 y 10.935 m según el método y el punto exacto",
+    "fuentes": ["https://rbr-global.com/how-deep-is-the-ocean-mapping-measuring-and-diving-to-the-mariana-trenchs-challenger-deep/", "https://en.wikipedia.org/wiki/Challenger_Deep"],
+    "comprobado": "2026-10-10"
+  },
+  "campo_futbol": {
+    "nombre": "Campo de fútbol", "medida_m": 105, "dimension": "longitud", "forma": "campo",
+    "nota": "Medida recomendada por la FIFA para partidos internacionales (105 x 68 m)",
+    "fuentes": ["https://footballhistory.org/field.html", "https://www.laps4.com/preguntas-y-respuestas/que-forma-tiene-que-ser-el-terreno-del-juego-de-futbol"],
+    "comprobado": "2026-10-10"
+  },
+  "a380": {
+    "nombre": "Airbus A380", "medida_m": 72.72, "dimension": "longitud", "forma": "avion",
+    "nota": "Longitud del A380-800",
+    "fuentes": ["https://skybrary.aero/index.php/A388", "https://flyawaysimulation.com/ask/answers/airbus-a380-dimensions-capacity-layout/"],
+    "comprobado": "2026-10-10"
+  },
+  "titanic": {
+    "nombre": "Titanic", "medida_m": 269.06, "dimension": "longitud", "forma": "barco",
+    "nota": "882 pies y 9 pulgadas",
+    "fuentes": ["https://en.wikipedia.org/wiki/Titanic", "https://dlab.epfl.ch/wikispeedia/wpcd/wp/r/RMS_Titanic.htm"],
+    "comprobado": "2026-10-10"
+  },
+  "golden_gate": {
+    "nombre": "Golden Gate", "medida_m": 2737, "dimension": "longitud", "forma": "puente",
+    "nota": "Longitud total con los accesos (vano central, 1.280 m)",
+    "fuentes": ["https://www.hmdb.org/m.asp?m=176583", "https://simple.wikipedia.com/wiki/Golden_Gate_Bridge"],
+    "comprobado": "2026-10-10"
+  }
+}

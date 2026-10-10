@@ -54,9 +54,24 @@ def registrar(nombre, ficha, usado):
 
 def main():
     parser = argparse.ArgumentParser(description="Genera una animación por código para un short")
-    parser.add_argument("short", help="carpeta del short en shorts/ (019-huracan_isaias)")
-    parser.add_argument("nombre", help="nombre de la animación (su ficha y el clip)")
+    parser.add_argument("short", nargs="?", help="carpeta del short en shorts/ (019-huracan_isaias)")
+    parser.add_argument("nombre", nargs="?", help="nombre de la animación (su ficha y el clip)")
+    parser.add_argument("--ficha", help="probar una ficha suelta: el vídeo va a data/pruebas/animaciones/ "
+                                        "y no se registra en el índice")
     args = parser.parse_args()
+
+    if args.ficha:
+        ruta_ficha = Path(args.ficha).resolve()
+        ficha = json.loads(ruta_ficha.read_text(encoding="utf-8"))
+        if ficha.get("tipo") not in TIPOS:
+            raise SystemExit(f"Tipo de animación desconocido: {ficha.get('tipo')!r} (hay: {', '.join(TIPOS)})")
+        salida = RAIZ / "data" / "pruebas" / "animaciones" / f"{ruta_ficha.stem}.mp4"
+        salida.parent.mkdir(parents=True, exist_ok=True)
+        usado = importlib.import_module(TIPOS[ficha["tipo"]]).crear(ficha, salida, CACHE)
+        print(f"Prueba: {salida.relative_to(RAIZ)} ({usado['fotogramas']} fotogramas; sin registrar)")
+        return
+    if not (args.short and args.nombre):
+        parser.error("hacen falta <short> y <nombre>, o --ficha")
 
     ruta_ficha = RAIZ / "shorts" / args.short / "animaciones" / f"{args.nombre}.json"
     if not ruta_ficha.exists():

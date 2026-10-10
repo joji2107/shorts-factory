@@ -185,6 +185,12 @@ leen y la hoja para leer las trata sola):
   quepan en 2 líneas de 36 caracteres con «CONTROL: ») e `icono`, `resumen` y `casos`; un
   `[plano <nombre> N 3]` por frase de paso (N = 0, 5, 10...), el resumen tras el respiro y
   `"video": {"ritmo": {"relleno_min": 1.8}}` en la receta para que la animación no se corte.
+  Para comparar tamaños, `comparacion_escala`: `orientacion` (`vertical` para alturas y
+  profundidades, `horizontal` para longitudes), `objetos` con `ref` de `config/referencias_escala.json`
+  (persona, torre_eiffel, sagrada_familia, estatua_libertad, piramide_guiza, burj_khalifa, everest,
+  fosa_marianas, campo_futbol, a380, titanic, golden_gate) o propios con `medida_m`, `forma` y sus
+  fuentes en el guion, uno `destacado`, y `final` o `proporcion`. Una referencia nueva solo entra en
+  ese archivo con dos fuentes y la fecha. Pruébala antes con `animar.py --ficha`.
 - `[plano negro 0 N]`: pantalla en negro. `video.imagen.acercar: {foto: [x, y]}`: zoom lento
   hacia ese punto de la foto. Un efecto con `"al_empezar": true` suena al empezar su palabra.
 - Carrusel rápido: planos de 2-3 s cada 2-3 palabras; se recortan solos (hasta 0,5 s).

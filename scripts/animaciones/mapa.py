@@ -118,3 +118,24 @@ def texto(ax_o_fig, x, y, cadena, px, color=TEXTO, negrita=False, **kw):
     """Texto con la fuente de la marca y contorno; px es el alto de la letra en píxeles."""
     return ax_o_fig.text(x, y, cadena, fontsize=pt(px), color=color, family=FUENTE,
                          weight="bold" if negrita else "normal", path_effects=contorno(), **kw)
+
+
+def grabar(fig, total, salida, fotograma, fundido=0.4):
+    """Graba total fotogramas de fig en salida (1080x1920, 30 fps): para cada uno llama a
+    fotograma(n), que lo prepara, y pasa la imagen a FFmpeg por una tubería, sin guardar PNG.
+    Empieza con un fundido desde el azul marino. (Los tipos anteriores llevan esto copiado; el
+    de comparacion_escala ya usa esta función.)"""
+    import subprocess
+    ffmpeg = subprocess.Popen([
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{ANCHO}x{ALTO}", "-r", "30", "-i", "-",
+        "-vf", f"fade=t=in:st=0:d={fundido}:color={MAR}",
+        "-frames:v", str(total), "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+        str(salida),
+    ], stdin=subprocess.PIPE)
+    for n in range(total):
+        fotograma(n)
+        ffmpeg.stdin.write(bytes(fig.canvas.buffer_rgba()))
+    ffmpeg.stdin.close()
+    if ffmpeg.wait() != 0:
+        raise RuntimeError("FFmpeg no ha podido crear el vídeo de la animación")
