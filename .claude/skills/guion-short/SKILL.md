@@ -181,6 +181,10 @@ leen y la hoja para leer las trata sola):
   (`puente`, `isla`, `tunel`), `km` y `nombre` (en dos líneas si es largo), `extremos`,
   `torres_km`/`torres_m`/`galibo_m` verificados y `avion` si viene a cuento; el coche se hunde
   en el túnel hacia el 55 % de la animación, así que ánclala detrás del respiro de la revelación.
+  Para explicar un proceso, `recorrido_pasos` (021): `pasos` con `titulo`, `texto`, `control` (que
+  quepan en 2 líneas de 36 caracteres con «CONTROL: ») e `icono`, `resumen` y `casos`; un
+  `[plano <nombre> N 3]` por frase de paso (N = 0, 5, 10...), el resumen tras el respiro y
+  `"video": {"ritmo": {"relleno_min": 1.8}}` en la receta para que la animación no se corte.
 - `[plano negro 0 N]`: pantalla en negro. `video.imagen.acercar: {foto: [x, y]}`: zoom lento
   hacia ese punto de la foto. Un efecto con `"al_empezar": true` suena al empezar su palabra.
 - Carrusel rápido: planos de 2-3 s cada 2-3 palabras; se recortan solos (hasta 0,5 s).

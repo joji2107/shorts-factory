@@ -318,5 +318,22 @@ casi nada de eso, así que se añadió:
   del aeropuerto. `animar.py` escribía en el índice la fuente del huracán para cualquier
   animación: ahora cada módulo devuelve la suya.
 
+## Short 021-voto_correo: una animación larga de servicio público
+
+- **Rigor**: cada paso sale de la LOREG en el BOE (arts. 72, 73 y 88, descargada y leída en local
+  porque la web cortaba el texto), de la instrucción 5/2023 de la Junta Electoral Central y de
+  Correos. Lo que no estaba claro se quedó fuera: los plazos (los medios no coinciden en el
+  último día) y la app MiDNI (un medio la daba por válida, pero la JEC la suspendió el 26 de
+  marzo de 2026 y no consta que lo haya levantado). Los casos reales, sin partidos ni nombres:
+  Melilla 2008 (condena firme del Supremo, 2021) y Melilla 2023 (en instrucción), y cómo se
+  detectó el de 2023: solicitudes anómalas (casi el 20 % del censo) y robos a carteros.
+- **Animación `recorrido_pasos`** (45 s, la protagonista): seis tarjetas con su control, el
+  resumen y los casos. Para que cada paso salga cuando se dice, cada tramo de 5 s va anclado a
+  su frase con un `[plano]` de 3 s («corto»: se puede acortar) y la receta sube
+  `relleno_min` a 1,8 s, así los huecos alargan la tarjeta en vez de meter otro vídeo.
+- **Material**: lo electoral de Pixabay es de otros países (EE. UU., Francia, India) y no se
+  usa en un vídeo sobre España; el relleno son vídeos de España de la biblioteca y una mano
+  escribiendo, puestos a mano en la receta.
+
 ## Qué he aprendido
 [completa con lo que has aprendido en esta fase]
